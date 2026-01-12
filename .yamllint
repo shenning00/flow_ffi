@@ -1,0 +1,22 @@
+---
+# YAML Linting Configuration for Flow FFI Project
+extends: default
+
+rules:
+  # Allow longer lines for comments and URLs
+  line-length:
+    max: 180
+    level: warning
+
+  # Allow document start (---) to be optional
+  document-start:
+    present: false
+
+  # Allow comments to have various indentation
+  comments:
+    min-spaces-from-content: 1
+
+  # Indentation settings
+  indentation:
+    spaces: 2
+    indent-sequences: true

@@ -1,0 +1,41 @@
+name: flow_ffi
+description: A Flutter FFI bridge for the flow-core computational graph library, enabling real-time data processing and node-based computation in Dart applications.
+version: 1.0.0
+
+repository: https://github.com/example/flow_ffi
+homepage: https://github.com/example/flow_ffi
+issue_tracker: https://github.com/example/flow_ffi/issues
+documentation: https://pub.dev/documentation/flow_ffi
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+  
+topics:
+  - ffi
+  - computational-graph
+  - data-processing
+  - flutter
+  - native
+  - flow-core
+  
+platforms:
+  android:
+  ios:
+  linux:
+  macos:
+  windows:
+
+dependencies:
+  ffi: ^2.1.0
+
+dev_dependencies:
+  test: ^1.24.0
+  ffigen: ^11.0.0
+
+ffigen:
+  output: 'lib/src/ffi/bindings_generated.dart'
+  headers:
+    entry-points:
+      - '../include/flow_ffi.h'
+  name: 'FlowCoreBindings'
+  description: 'Bindings for flow_ffi'

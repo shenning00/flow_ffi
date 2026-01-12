@@ -1,0 +1,91 @@
+# Analysis options for Flow FFI Dart package
+# This configuration provides strict linting while excluding generated code
+
+analyzer:
+  exclude:
+    # Exclude generated FFI bindings from analysis
+    - lib/src/ffi/bindings_generated.dart
+    # Exclude build artifacts
+    - build/**
+    - .dart_tool/**
+
+  errors:
+    # Treat these as errors
+    invalid_annotation_target: error
+    missing_required_param: error
+    missing_return: error
+
+    # Keep warnings as warnings (not errors) for gradual improvement
+    unused_element: warning
+    unused_field: warning
+    unused_import: warning
+    unused_local_variable: warning
+    unnecessary_type_check: warning
+
+    # Demote deprecated warnings to info for now
+    deprecated_member_use: info
+
+  language:
+    # Enable strict mode for better type safety
+    strict-casts: false
+    strict-inference: false
+    strict-raw-types: false
+
+linter:
+  rules:
+    # Critical error-prevention rules
+    - avoid_empty_else
+    - avoid_relative_lib_imports
+    - avoid_slow_async_io
+    - cancel_subscriptions
+    - close_sinks
+    - control_flow_in_finally
+    - empty_statements
+    - hash_and_equals
+    - no_adjacent_strings_in_list
+    - no_duplicate_case_values
+    - test_types_in_equals
+    - throw_in_finally
+    - valid_regexps
+
+    # Code style rules
+    - always_declare_return_types
+    - annotate_overrides
+    - avoid_init_to_null
+    - avoid_null_checks_in_equality_operators
+    - avoid_return_types_on_setters
+    - camel_case_extensions
+    - camel_case_types
+    - curly_braces_in_flow_control_structures
+    - empty_catches
+    - empty_constructor_bodies
+    - library_names
+    - library_prefixes
+    - null_closures
+    - prefer_adjacent_string_concatenation
+    - prefer_collection_literals
+    - prefer_conditional_assignment
+    - prefer_contains
+    - prefer_final_fields
+    - prefer_for_elements_to_map_fromIterable
+    - prefer_generic_function_type_aliases
+    - prefer_if_null_operators
+    - prefer_is_empty
+    - prefer_is_not_empty
+    - prefer_iterable_whereType
+    - prefer_single_quotes
+    - prefer_spread_collections
+    - recursive_getters
+    - slash_for_doc_comments
+    - type_init_formals
+    - unnecessary_brace_in_string_interps
+    - unnecessary_const
+    - unnecessary_getters_setters
+    - unnecessary_new
+    - unnecessary_null_in_if_null_operators
+    - unnecessary_this
+    - use_function_type_syntax_for_parameters
+    - use_rethrow_when_possible
+
+    # Pub rules
+    - package_names

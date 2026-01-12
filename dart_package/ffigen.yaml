@@ -1,0 +1,6 @@
+name: 'FlowCoreBindings'
+description: 'Bindings for flow_ffi'
+output: 'lib/src/ffi/bindings_generated.dart'
+headers:
+  entry-points:
+    - '../include/flow_ffi.h'
