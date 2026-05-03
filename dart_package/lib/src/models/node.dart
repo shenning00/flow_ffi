@@ -685,6 +685,86 @@ class Node {
     }
   }
 
+  /// Get metadata for a specific output port.
+  ///
+  /// [portKey] is the identifier of the output port.
+  ///
+  /// Returns the port metadata containing type information and default value,
+  /// or null if the port doesn't exist or metadata is not available.
+  ///
+  /// The underlying C function `flow_node_get_port_metadata` accepts either
+  /// an input or output key (see src/node_bridge.cpp:801-814); this method
+  /// is the direction-labelled twin of [getInputPortMetadata].
+  ///
+  /// Throws [InvalidArgumentException] if portKey is empty.
+  /// Throws [InvalidHandleException] if the node handle is invalid.
+  PortMetadata? getOutputPortMetadata(String portKey) {
+    if (portKey.isEmpty) {
+      throw const InvalidArgumentException('Port key cannot be empty');
+    }
+
+    final cPortKey = portKey.toNativeUtf8();
+    final metadataPtr =
+        calloc.allocate<FlowPortMetadata>(sizeOf<FlowPortMetadata>());
+
+    try {
+      final result = flowCore.native.flow_node_get_port_metadata(
+        _handle.handle,
+        cPortKey.cast<Char>(),
+        metadataPtr.cast<FlowPortMetadata>(),
+      );
+
+      if (result != 0) {
+        ErrorHandler.checkErrorCode(result);
+        return null;
+      }
+
+      final key = metadataPtr.ref.key != nullptr
+          ? metadataPtr.ref.key.cast<Utf8>().toDartString()
+          : portKey;
+
+      final interworkingValueJson = metadataPtr.ref.interworking_value_json !=
+              nullptr
+          ? metadataPtr.ref.interworking_value_json.cast<Utf8>().toDartString()
+          : null;
+
+      final hasDefault = metadataPtr.ref.has_default;
+
+      final dartMetadata = PortMetadata(
+        key: key,
+        interworkingValueJson: interworkingValueJson,
+        hasDefault: hasDefault,
+      );
+
+      flowCore.native.flow_free_port_metadata(metadataPtr);
+
+      return dartMetadata;
+    } finally {
+      calloc.free(cPortKey);
+      calloc.free(metadataPtr);
+    }
+  }
+
+  /// Get metadata for all output ports.
+  ///
+  /// Returns a list of PortMetadata objects for each output port on this node.
+  /// The list will be empty if there are no output ports.
+  ///
+  /// There is no bulk FFI equivalent to `flow_node_get_input_ports_metadata`
+  /// for outputs, so this iterates [getOutputPortKeys] and calls
+  /// [getOutputPortMetadata] per key.
+  ///
+  /// Throws [InvalidHandleException] if the node handle is invalid.
+  List<PortMetadata> getAllOutputPortsMetadata() {
+    final keys = getOutputPortKeys();
+    final metadata = <PortMetadata>[];
+    for (final key in keys) {
+      final m = getOutputPortMetadata(key);
+      if (m != null) metadata.add(m);
+    }
+    return metadata;
+  }
+
   /// Get metadata for all input ports.
   ///
   /// Returns a list of PortMetadata objects for each input port on this node.
