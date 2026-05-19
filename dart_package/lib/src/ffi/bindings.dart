@@ -52,6 +52,7 @@ class FlowCoreBindings {
 
   // Convenience methods for the most common operations
   Pointer<Char> flow_get_last_error() => _flowCore.flow_get_last_error();
+  int flow_get_last_error_code() => _flowCore.flow_get_last_error_code();
   void flow_clear_error() => _flowCore.flow_clear_error();
   void flow_set_error(int code, Pointer<Char> message) =>
       _flowCore.flow_set_error(code, message);

@@ -115,39 +115,42 @@ class ErrorHandler {
   /// Check for errors after a native function call and throw appropriate exceptions
   static void checkError() {
     final errorMessage = flowCore.flow_get_last_error();
-    if (errorMessage != nullptr) {
-      final message = errorMessage.cast<Utf8>().toDartString();
-      flowCore.flow_clear_error();
+    if (errorMessage == nullptr) {
+      // No pending error: nothing to do.
+      return;
+    }
 
-      // Determine error type from message (could be improved with error codes)
-      if (message.contains('Invalid handle')) {
+    final message = errorMessage.cast<Utf8>().toDartString();
+    // Read the numeric error code BEFORE clearing the error.
+    final code = flowCore.flow_get_last_error_code();
+    flowCore.flow_clear_error();
+
+    // Classify by the numeric error CODE rather than substring-matching the
+    // human-readable message (which is fragile and misclassifies errors).
+    switch (FlowError.fromValue(code)) {
+      case FlowError.invalidHandle:
         throw InvalidHandleException(message);
-      } else if (message.contains('Invalid argument')) {
+      case FlowError.invalidArgument:
         throw InvalidArgumentException(message);
-      } else if (message.contains('not found')) {
-        if (message.contains('node') || message.contains('Node')) {
-          throw NodeNotFoundException(message);
-        } else if (message.contains('port') || message.contains('Port')) {
-          throw PortNotFoundException(message);
-        }
-      } else if (message.contains('connection') ||
-          message.contains('Connection')) {
+      case FlowError.nodeNotFound:
+        throw NodeNotFoundException(message);
+      case FlowError.portNotFound:
+        throw PortNotFoundException(message);
+      case FlowError.connectionFailed:
         throw ConnectionFailedException(message);
-      } else if (message.contains('module') || message.contains('Module')) {
+      case FlowError.moduleLoadFailed:
         throw ModuleLoadFailedException(message);
-      } else if (message.contains('computation') ||
-          message.contains('Computation')) {
+      case FlowError.computationFailed:
         throw ComputationFailedException(message);
-      } else if (message.contains('memory') || message.contains('Memory')) {
+      case FlowError.outOfMemory:
         throw OutOfMemoryException(message);
-      } else if (message.contains('type') || message.contains('Type')) {
+      case FlowError.typeMismatch:
         throw TypeMismatchException(message);
-      } else if (message.contains('not implemented') ||
-          message.contains('Not implemented')) {
+      case FlowError.notImplemented:
         throw NotImplementedException(message);
-      } else {
+      case FlowError.success:
+      case FlowError.unknown:
         throw UnknownFlowException(message);
-      }
     }
   }
 

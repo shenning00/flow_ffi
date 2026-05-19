@@ -71,6 +71,9 @@ typedef struct FlowConnectionInfo {
 // Get the last error message
 FLOW_FFI_EXPORT const char* flow_get_last_error(void);
 
+// Get the last error code (FlowError enum value, returned as int for a stable C ABI)
+FLOW_FFI_EXPORT int flow_get_last_error_code(void);
+
 // Clear the last error
 FLOW_FFI_EXPORT void flow_clear_error(void);
 

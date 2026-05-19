@@ -24,11 +24,9 @@
 
 using namespace flow;
 
-// Wrapper structure for Node (consistent with factory_bridge.cpp)
-struct NodeWrapper {
-    SharedNode node;
-    NodeWrapper(SharedNode n) : node(std::move(n)) {}
-};
+// NodeWrapper is defined in the shared header to guarantee one ODR-compliant
+// definition across all TUs that create or look up node handles.
+#include "node_wrapper.hpp"
 
 extern "C" {
 
@@ -121,11 +119,9 @@ FLOW_FFI_EXPORT FlowNodeHandle flow_graph_add_node(FlowGraphHandle graph, const 
             return nullptr;
         }
 
-        // Create wrapper with the original node (same as factory bridge approach)
-        // The original node is now managed by the graph, so it's safe to use
-        auto wrapper = NodeWrapper(node);
         flow_ffi::ErrorManager::instance().clear_error();
-        return reinterpret_cast<FlowNodeHandle>(flow_ffi::create_handle<NodeWrapper>(wrapper));
+        return reinterpret_cast<FlowNodeHandle>(
+            flow_ffi::get_or_create_node_handle(node));
     });
 }
 
@@ -193,11 +189,9 @@ FLOW_FFI_EXPORT FlowNodeHandle flow_graph_get_node(FlowGraphHandle graph, const 
             return nullptr;
         }
 
-        // Create handle for the node (consistent with factory_bridge.cpp)
-        auto wrapper = NodeWrapper(std::move(node));
-        auto handle = flow_ffi::create_handle<NodeWrapper>(wrapper);
         flow_ffi::ErrorManager::instance().clear_error();
-        return static_cast<FlowNodeHandle>(handle);
+        return static_cast<FlowNodeHandle>(
+            flow_ffi::get_or_create_node_handle(std::move(node)));
     });
 }
 
@@ -231,9 +225,8 @@ FLOW_FFI_EXPORT FlowError flow_graph_get_nodes(FlowGraphHandle graph, FlowNodeHa
 
         size_t i = 0;
         for (const auto& [uuid, node] : node_map) {
-            auto wrapper = NodeWrapper(node);
-            auto handle = flow_ffi::create_handle<NodeWrapper>(wrapper);
-            (*nodes)[i++] = static_cast<FlowNodeHandle>(handle);
+            (*nodes)[i++] = static_cast<FlowNodeHandle>(
+                flow_ffi::get_or_create_node_handle(node));
         }
 
         flow_ffi::ErrorManager::instance().clear_error();

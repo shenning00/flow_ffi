@@ -5,6 +5,7 @@
 
 #include "error_handling.hpp"
 #include "handle_manager.hpp"
+#include "node_wrapper.hpp"
 
 // Include flow-core headers
 #include <flow/core/Connection.hpp>
@@ -13,12 +14,37 @@
 #include <flow/core/Node.hpp>
 
 #include <algorithm>
+#include <cstring>
 #include <memory>
 #include <mutex>
 #include <string>
+#include <string_view>
 #include <unordered_set>
 
 using namespace flow;
+
+namespace {
+
+// Heap-duplicate a C-string using new char[] so it is compatible with
+// flow_free_string (which calls delete[]).  Ownership transfers to the caller.
+// Returns nullptr when s is nullptr.
+char* dup_cstr(const char* s) {
+    if (!s) return nullptr;
+    const std::size_t len = std::strlen(s);
+    char* buf = new char[len + 1];
+    std::memcpy(buf, s, len + 1);
+    return buf;
+}
+
+// Overload for std::string_view (e.g. IndexableName::name() return type).
+char* dup_cstr(std::string_view sv) {
+    char* buf = new char[sv.size() + 1];
+    std::memcpy(buf, sv.data(), sv.size());
+    buf[sv.size()] = '\0';
+    return buf;
+}
+
+} // namespace
 
 // Event registration structure
 struct FlowEventRegistration {
@@ -109,8 +135,7 @@ flow_graph_on_node_added(FlowGraphHandle graph, FlowNodeEventCallback callback, 
         // Bind to the graph's OnNodeAdded event
         (*graph_ptr)
             ->OnNodeAdded.Bind(reg->event_id, [callback, user_data](const SharedNode& node) {
-                // Convert SharedNode to handle and call Dart callback
-                auto node_handle = flow_ffi::create_handle<std::shared_ptr<Node>>(node);
+                auto node_handle = flow_ffi::get_or_create_node_handle(node);
                 callback(static_cast<FlowNodeHandle>(node_handle), user_data);
             });
 
@@ -143,8 +168,7 @@ flow_graph_on_node_removed(FlowGraphHandle graph, FlowNodeEventCallback callback
         // Bind to the graph's OnNodeRemoved event
         (*graph_ptr)
             ->OnNodeRemoved.Bind(reg->event_id, [callback, user_data](const SharedNode& node) {
-                // Convert SharedNode to handle and call Dart callback
-                auto node_handle = flow_ffi::create_handle<std::shared_ptr<Node>>(node);
+                auto node_handle = flow_ffi::get_or_create_node_handle(node);
                 callback(static_cast<FlowNodeHandle>(node_handle), user_data);
             });
 
@@ -249,7 +273,8 @@ FlowEventRegistrationHandle flow_graph_on_error(FlowGraphHandle graph,
         // Bind to the graph's OnError event
         (*graph_ptr)
             ->OnError.Bind(reg->event_id, [callback, user_data](const std::exception& error) {
-                callback(error.what(), user_data);
+                // Ownership transferred to caller; Dart frees via flow_free_string.
+                callback(dup_cstr(error.what()), user_data);
             });
 
         flow_ffi::ErrorManager::instance().clear_error();
@@ -267,8 +292,8 @@ FlowEventRegistrationHandle flow_node_on_compute(FlowNodeHandle node,
             return nullptr;
         }
 
-        auto* node_ptr = flow_ffi::get_handle<std::shared_ptr<Node>>(node);
-        if (!node_ptr || !*node_ptr) {
+        auto* node_wrapper = flow_ffi::get_handle<NodeWrapper>(node);
+        if (!node_wrapper || !node_wrapper->node) {
             flow_ffi::ErrorManager::instance().set_error(FLOW_ERROR_INVALID_HANDLE,
                                                          "Failed to get node from handle");
             return nullptr;
@@ -280,8 +305,8 @@ FlowEventRegistrationHandle flow_node_on_compute(FlowNodeHandle node,
         auto* reg = reinterpret_cast<FlowEventRegistration*>(registration);
 
         // Bind to the node's OnCompute event
-        (*node_ptr)->OnCompute.Bind(reg->event_id,
-                                    [callback, user_data, node]() { callback(node, user_data); });
+        node_wrapper->node->OnCompute.Bind(reg->event_id,
+                                           [callback, user_data, node]() { callback(node, user_data); });
 
         flow_ffi::ErrorManager::instance().clear_error();
         return registration;
@@ -297,8 +322,8 @@ FlowEventRegistrationHandle flow_node_on_error(FlowNodeHandle node, FlowErrorEve
             return nullptr;
         }
 
-        auto* node_ptr = flow_ffi::get_handle<std::shared_ptr<Node>>(node);
-        if (!node_ptr || !*node_ptr) {
+        auto* node_wrapper = flow_ffi::get_handle<NodeWrapper>(node);
+        if (!node_wrapper || !node_wrapper->node) {
             flow_ffi::ErrorManager::instance().set_error(FLOW_ERROR_INVALID_HANDLE,
                                                          "Failed to get node from handle");
             return nullptr;
@@ -310,10 +335,11 @@ FlowEventRegistrationHandle flow_node_on_error(FlowNodeHandle node, FlowErrorEve
         auto* reg = reinterpret_cast<FlowEventRegistration*>(registration);
 
         // Bind to the node's OnError event
-        (*node_ptr)->OnError.Bind(reg->event_id,
-                                  [callback, user_data](const std::exception& error) {
-                                      callback(error.what(), user_data);
-                                  });
+        node_wrapper->node->OnError.Bind(reg->event_id,
+                                         [callback, user_data](const std::exception& error) {
+                                             // Ownership transferred to caller; Dart frees via flow_free_string.
+                                             callback(dup_cstr(error.what()), user_data);
+                                         });
 
         flow_ffi::ErrorManager::instance().clear_error();
         return registration;
@@ -329,8 +355,8 @@ flow_node_on_set_input(FlowNodeHandle node, FlowNodeDataEventCallback callback, 
             return nullptr;
         }
 
-        auto* node_ptr = flow_ffi::get_handle<std::shared_ptr<Node>>(node);
-        if (!node_ptr || !*node_ptr) {
+        auto* node_wrapper = flow_ffi::get_handle<NodeWrapper>(node);
+        if (!node_wrapper || !node_wrapper->node) {
             flow_ffi::ErrorManager::instance().set_error(FLOW_ERROR_INVALID_HANDLE,
                                                          "Failed to get node from handle");
             return nullptr;
@@ -342,13 +368,13 @@ flow_node_on_set_input(FlowNodeHandle node, FlowNodeDataEventCallback callback, 
         auto* reg = reinterpret_cast<FlowEventRegistration*>(registration);
 
         // Bind to the node's OnSetInput event
-        (*node_ptr)->OnSetInput.Bind(
+        node_wrapper->node->OnSetInput.Bind(
             reg->event_id,
             [callback, user_data, node](const IndexableName& port_key, const SharedNodeData& data) {
                 // Convert data to handle
                 auto data_handle = flow_ffi::create_handle<SharedNodeData>(data);
-                std::string port_key_str(port_key.name());
-                callback(node, port_key_str.c_str(), static_cast<FlowNodeDataHandle>(data_handle),
+                // Ownership transferred to caller; Dart frees via flow_free_string.
+                callback(node, dup_cstr(port_key.name()), static_cast<FlowNodeDataHandle>(data_handle),
                          user_data);
             });
 
@@ -366,8 +392,8 @@ flow_node_on_set_output(FlowNodeHandle node, FlowNodeDataEventCallback callback,
             return nullptr;
         }
 
-        auto* node_ptr = flow_ffi::get_handle<std::shared_ptr<Node>>(node);
-        if (!node_ptr || !*node_ptr) {
+        auto* node_wrapper = flow_ffi::get_handle<NodeWrapper>(node);
+        if (!node_wrapper || !node_wrapper->node) {
             flow_ffi::ErrorManager::instance().set_error(FLOW_ERROR_INVALID_HANDLE,
                                                          "Failed to get node from handle");
             return nullptr;
@@ -379,13 +405,13 @@ flow_node_on_set_output(FlowNodeHandle node, FlowNodeDataEventCallback callback,
         auto* reg = reinterpret_cast<FlowEventRegistration*>(registration);
 
         // Bind to the node's OnSetOutput event
-        (*node_ptr)->OnSetOutput.Bind(
+        node_wrapper->node->OnSetOutput.Bind(
             reg->event_id,
             [callback, user_data, node](const IndexableName& port_key, const SharedNodeData& data) {
                 // Convert data to handle
                 auto data_handle = flow_ffi::create_handle<SharedNodeData>(data);
-                std::string port_key_str(port_key.name());
-                callback(node, port_key_str.c_str(), static_cast<FlowNodeDataHandle>(data_handle),
+                // Ownership transferred to caller; Dart frees via flow_free_string.
+                callback(node, dup_cstr(port_key.name()), static_cast<FlowNodeDataHandle>(data_handle),
                          user_data);
             });
 
@@ -440,20 +466,20 @@ FlowError flow_event_unregister(FlowEventRegistrationHandle registration) {
             case FlowEventRegistration::Type::NodeError:
             case FlowEventRegistration::Type::NodeSetInput:
             case FlowEventRegistration::Type::NodeSetOutput: {
-                auto* node_ptr = flow_ffi::get_handle<std::shared_ptr<Node>>(reg->handle);
-                if (node_ptr && *node_ptr) {
+                auto* node_wrapper = flow_ffi::get_handle<NodeWrapper>(reg->handle);
+                if (node_wrapper && node_wrapper->node) {
                     switch (reg->type) {
                         case FlowEventRegistration::Type::NodeCompute:
-                            (*node_ptr)->OnCompute.Unbind(reg->event_id);
+                            node_wrapper->node->OnCompute.Unbind(reg->event_id);
                             break;
                         case FlowEventRegistration::Type::NodeError:
-                            (*node_ptr)->OnError.Unbind(reg->event_id);
+                            node_wrapper->node->OnError.Unbind(reg->event_id);
                             break;
                         case FlowEventRegistration::Type::NodeSetInput:
-                            (*node_ptr)->OnSetInput.Unbind(reg->event_id);
+                            node_wrapper->node->OnSetInput.Unbind(reg->event_id);
                             break;
                         case FlowEventRegistration::Type::NodeSetOutput:
-                            (*node_ptr)->OnSetOutput.Unbind(reg->event_id);
+                            node_wrapper->node->OnSetOutput.Unbind(reg->event_id);
                             break;
                         default:
                             break;

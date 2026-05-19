@@ -16,6 +16,14 @@ class FlowService {
   Graph? _graph;
   NodeFactory? _factory;
 
+  /// Whether this service owns (and must dispose) its native handles.
+  ///
+  /// `true` for the default [initialize] / [createGraph] path. Set to `false`
+  /// by [adoptExisting] when the Environment/Graph/Factory are owned by
+  /// another component (e.g. the visual controller) — in that case [cleanup]
+  /// must not dispose them, since double-dispose of native handles crashes.
+  bool _ownsHandles = true;
+
   final StreamController<GraphEvent> _graphEventsController =
       StreamController<GraphEvent>.broadcast();
   final StreamController<NodeEvent> _nodeEventsController =
@@ -53,6 +61,33 @@ class FlowService {
       _errorsController.add(error);
       rethrow;
     }
+  }
+
+  /// Adopts an already-constructed Environment / Graph / Factory instead of
+  /// allocating its own native handles.
+  ///
+  /// Use this when another component (e.g. the visual node controller) has
+  /// already created the native flow environment and this service should
+  /// operate on the *same* environment rather than a second, independent one.
+  ///
+  /// Ownership of the handles stays with the caller: [cleanup] will NOT
+  /// dispose the injected Environment/Graph/Factory (only stream controllers
+  /// and event registrations are released). Disposing them is the caller's
+  /// responsibility.
+  ///
+  /// Graph event listeners are wired equivalently to [createGraph] so
+  /// [graphEvents] / [nodeEvents] / [errors] stay consistent with the default
+  /// path.
+  void adoptExisting({
+    required Environment environment,
+    required Graph graph,
+    required NodeFactory factory,
+  }) {
+    _ownsHandles = false;
+    _environment = environment;
+    _graph = graph;
+    _factory = factory;
+    _setupGraphEventListeners(graph);
   }
 
   /// Creates a new computational graph.
@@ -267,9 +302,14 @@ class FlowService {
   /// Cleanup all resources.
   Future<void> cleanup() async {
     try {
-      _graph?.dispose();
-      _factory?.dispose();
-      _environment?.dispose();
+      // Only dispose native handles this service actually owns. When handles
+      // were injected via [adoptExisting] their lifecycle is managed by the
+      // owning component; disposing them here would double-free and crash.
+      if (_ownsHandles) {
+        _graph?.dispose();
+        _factory?.dispose();
+        _environment?.dispose();
+      }
     } catch (e) {
       final error = e is FlowException ? e : UnknownFlowException(e.toString());
       _errorsController.add(error);

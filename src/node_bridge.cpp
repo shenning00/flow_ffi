@@ -11,11 +11,9 @@
 
 using namespace flow;
 
-// Forward declarations for wrappers (defined in other files)
-struct NodeWrapper {
-    SharedNode node;
-    NodeWrapper(SharedNode n) : node(std::move(n)) {}
-};
+// NodeWrapper is defined in the shared header to guarantee one ODR-compliant
+// definition across all TUs that create or look up node handles.
+#include "node_wrapper.hpp"
 
 struct NodeDataWrapper {
     SharedNodeData data;

@@ -12,12 +12,9 @@
 
 using namespace flow;
 
-// Wrapper structure for Node
-struct NodeWrapper {
-    SharedNode node;
-
-    NodeWrapper(SharedNode n) : node(std::move(n)) {}
-};
+// NodeWrapper is defined in the shared header to guarantee one ODR-compliant
+// definition across all TUs that create or look up node handles.
+#include "node_wrapper.hpp"
 
 extern "C" {
 
@@ -69,9 +66,8 @@ FLOW_FFI_EXPORT FlowNodeHandle flow_factory_create_node(FlowNodeFactoryHandle fa
                 return nullptr;
             }
 
-            // Create wrapper and handle
-            auto wrapper = NodeWrapper(node);
-            return reinterpret_cast<FlowNodeHandle>(flow_ffi::create_handle<NodeWrapper>(wrapper));
+            return reinterpret_cast<FlowNodeHandle>(
+                flow_ffi::get_or_create_node_handle(node));
 
         } catch (const std::exception& e) {
             flow_ffi::ErrorManager::instance().set_error(

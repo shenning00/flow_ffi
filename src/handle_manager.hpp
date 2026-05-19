@@ -7,6 +7,13 @@
 #include <typeinfo>
 #include <unordered_map>
 
+#include <flow/core/Node.hpp>   // for flow::Node* secondary-index key
+
+// NodeWrapper must be visible here so the inline get_or_create_node_handle and
+// unregister_handle implementations can name Handle<NodeWrapper>.  node_wrapper.hpp
+// is guarded by #pragma once, so TUs that already include it get a no-op.
+#include "node_wrapper.hpp"
+
 namespace flow_ffi {
 
 // Base class for all managed handles
@@ -95,7 +102,18 @@ public:
     // Remove handle (called when reference count reaches 0)
     void unregister_handle(void* ptr) {
         std::lock_guard<std::mutex> lock(mutex_);
-        handles_.erase(ptr);
+        auto it = handles_.find(ptr);
+        if (it == handles_.end()) return;
+
+        // If this is a NodeWrapper handle, remove from the secondary index too.
+        // dynamic_cast is safe here: we hold the unique_ptr and the object is live.
+        if (auto* node_handle = dynamic_cast<Handle<NodeWrapper>*>(it->second.get())) {
+            flow::Node* identity = node_handle->get().node.get();
+            node_handles_.erase(identity);
+        }
+
+        handles_.erase(it);
+        // Dual-map consistency (CC3): both removals happen under the same lock.
     }
 
     // Get handle count (for debugging/testing)
@@ -108,6 +126,37 @@ public:
     void clear() {
         std::lock_guard<std::mutex> lock(mutex_);
         handles_.clear();
+        node_handles_.clear();
+    }
+
+    // Get the existing canonical handle for this node, or create a new one.
+    // Either way, retain() is called before returning so refcount equals
+    // the number of outstanding Dart owning wrappers.
+    //
+    // Thread safety: acquires mutex_ once for the entire operation.
+    void* get_or_create_node_handle(flow::SharedNode node) {
+        flow::Node* identity = node.get();  // stable raw pointer
+
+        std::lock_guard<std::mutex> lock(mutex_);
+
+        auto sec_it = node_handles_.find(identity);
+        if (sec_it != node_handles_.end()) {
+            // Canonical handle already exists. Retain for the new hand-out.
+            void* ptr = sec_it->second;
+            auto pri_it = handles_.find(ptr);
+            // pri_it must be valid if secondary index is consistent
+            pri_it->second->retain();
+            return ptr;
+        }
+
+        // First time this node is seen: create the canonical handle.
+        // Handle<NodeWrapper> constructor sets ref_count_ = 1, which accounts
+        // for this first hand-out. No extra retain() needed here.
+        auto handle = std::make_unique<Handle<NodeWrapper>>(std::move(node));
+        void* ptr = handle.get();
+        handles_[ptr] = std::move(handle);
+        node_handles_[identity] = ptr;
+        return ptr;
     }
 
 private:
@@ -116,6 +165,9 @@ private:
 
     mutable std::mutex mutex_;
     std::unordered_map<void*, std::unique_ptr<HandleBase>> handles_;
+    // Secondary index: Node identity -> canonical handle void*.
+    // Protected by the same mutex_ as handles_.
+    std::unordered_map<flow::Node*, void*> node_handles_;
 };
 
 // Helper functions for creating and managing handles
@@ -156,6 +208,11 @@ inline int32_t get_ref_count(void* ptr) {
         return handle->get_ref_count();
     }
     return 0;
+}
+
+// Canonical entry point for all node-producing call sites.
+inline void* get_or_create_node_handle(flow::SharedNode node) {
+    return HandleRegistry::instance().get_or_create_node_handle(std::move(node));
 }
 
 } // namespace flow_ffi

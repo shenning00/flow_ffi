@@ -8,7 +8,9 @@ issue_tracker: https://github.com/example/flow_ffi/issues
 documentation: https://pub.dev/documentation/flow_ffi
 
 environment:
-  sdk: '>=3.0.0 <4.0.0'
+  # NativeCallable (and NativeCallable.listener, used by EventManager for
+  # thread-safe native event callbacks) is only available since Dart 3.1.0.
+  sdk: '>=3.1.0 <4.0.0'
   
 topics:
   - ffi
@@ -31,6 +33,10 @@ dependencies:
 dev_dependencies:
   test: ^1.24.0
   ffigen: ^11.0.0
+  # Used by test/event_handle_ownership_test.dart to force a deterministic
+  # full GC via getAllocationProfile(gc: true). Optional at runtime — the
+  # test falls back to allocation pressure when the VM service is absent.
+  vm_service: ^14.0.0
 
 ffigen:
   output: 'lib/src/ffi/bindings_generated.dart'
