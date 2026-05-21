@@ -46,6 +46,7 @@ add_executable(flow_ffi_tests
     test_port_metadata_free.cpp
     test_node_identity_registry.cpp
     test_node_lifecycle.cpp
+    test_env_add_task_set_input_data.cpp
 )
 
 # Link libraries

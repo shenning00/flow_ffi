@@ -108,6 +108,27 @@ FLOW_FFI_EXPORT FlowNodeFactoryHandle flow_env_get_factory(FlowEnvHandle env);
 // Wait for all tasks to complete
 FLOW_FFI_EXPORT FlowError flow_env_wait(FlowEnvHandle env);
 
+/**
+ * Post a SetInputData call to the env's worker thread pool.
+ *
+ * The worker takes the node lock and calls SetInputData(port_key, data,
+ * compute=true). Returns immediately on the calling thread; the caller may
+ * release `data` (FFI handle) the moment this returns — the underlying
+ * SharedNode and SharedNodeData are ref-counted into the worker lambda by
+ * shared_ptr copy.
+ *
+ * Mirrors flow-ui's NodeView::on_input pattern. P1 of FLOW_RUN.html §10.11.
+ *
+ * @return FLOW_SUCCESS on accept; FLOW_ERROR_INVALID_HANDLE on a bad env/
+ *         node/data handle; FLOW_ERROR_INVALID_ARGUMENT on null/empty
+ *         port_key.
+ */
+FLOW_FFI_EXPORT FlowError flow_env_add_task_set_input_data(
+    FlowEnvHandle      env,
+    FlowNodeHandle     node,
+    const char*        port_key,
+    FlowNodeDataHandle data);
+
 // Get system environment variable
 FLOW_FFI_EXPORT const char* flow_env_get_var(FlowEnvHandle env, const char* name);
 

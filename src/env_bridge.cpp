@@ -1,9 +1,11 @@
 #include "flow_ffi.h"
 
 #include <flow/core/Env.hpp>
+#include <flow/core/IndexableName.hpp>
 #include <flow/core/NodeFactory.hpp>
 
 #include <cstring>
+#include <string>
 
 #include "env_wrapper.hpp"
 #include "error_handling.hpp"
@@ -94,6 +96,76 @@ FLOW_FFI_EXPORT FlowError flow_env_wait(FlowEnvHandle env) {
         }
 
         env_wrapper->env->Wait();
+        return FLOW_SUCCESS;
+    });
+}
+
+FLOW_FFI_EXPORT FlowError flow_env_add_task_set_input_data(
+        FlowEnvHandle env, FlowNodeHandle node,
+        const char* port_key, FlowNodeDataHandle data) {
+    FLOW_API_CALL({
+        // Validate all three handles.
+        if (!flow_ffi::validate_handle(env, "env")) {
+            return FLOW_ERROR_INVALID_HANDLE;
+        }
+        if (!flow_ffi::validate_handle(node, "node")) {
+            return FLOW_ERROR_INVALID_HANDLE;
+        }
+        if (!flow_ffi::validate_handle(data, "data")) {
+            return FLOW_ERROR_INVALID_HANDLE;
+        }
+
+        // Validate port_key: must be non-null and non-empty.
+        if (port_key == nullptr || port_key[0] == '\0') {
+            flow_ffi::ErrorManager::instance().set_error(
+                FLOW_ERROR_INVALID_ARGUMENT,
+                "Invalid argument: port_key must not be null or empty");
+            return FLOW_ERROR_INVALID_ARGUMENT;
+        }
+
+        auto* ew = flow_ffi::get_handle<EnvWrapper>(env);
+        if (!ew) {
+            flow_ffi::ErrorManager::instance().set_error(FLOW_ERROR_INVALID_HANDLE,
+                                                         "Invalid environment handle");
+            return FLOW_ERROR_INVALID_HANDLE;
+        }
+
+        auto* nw = flow_ffi::get_handle<NodeWrapper>(node);
+        if (!nw) {
+            flow_ffi::ErrorManager::instance().set_error(FLOW_ERROR_INVALID_HANDLE,
+                                                         "Invalid node handle");
+            return FLOW_ERROR_INVALID_HANDLE;
+        }
+
+        auto* dw = flow_ffi::get_handle<NodeDataWrapper>(data);
+        if (!dw) {
+            flow_ffi::ErrorManager::instance().set_error(FLOW_ERROR_INVALID_HANDLE,
+                                                         "Invalid data handle");
+            return FLOW_ERROR_INVALID_HANDLE;
+        }
+
+        // Capture shared_ptr copies by value into the lambda. The FFI handle
+        // refcount is NOT touched — the lambda owns its own shared_ptr refs.
+        // port_key is a caller C-string that may be freed after this returns,
+        // so we copy it into a std::string and construct IndexableName inside
+        // the lambda body (IndexableName holds a string_view, not an owned
+        // string, so constructing it from port_key here would leave a dangling
+        // view by the time the worker runs).
+        flow::SharedNode     cn = nw->node;
+        flow::SharedNodeData cd = dw->data;
+        std::string          k_str(port_key);   // owned copy — survives the lambda
+
+        // Note: Env::AddTask wraps the callable in [=]{task();} which requires
+        // the lambda's operator() to be const-callable.  We therefore avoid
+        // `mutable` by passing `cd` as a copy to SetInputData instead of
+        // std::move — functionally equivalent; the shared_ptr lifetime
+        // guarantee is preserved either way (the lambda holds its own ref).
+        ew->env->AddTask([cn, k_str, cd]() {
+            flow::IndexableName k(k_str);   // built from the owned std::string
+            std::lock_guard<flow::Node> lock(*cn);
+            cn->SetInputData(k, cd, /*compute=*/true);
+        });
+
         return FLOW_SUCCESS;
     });
 }
