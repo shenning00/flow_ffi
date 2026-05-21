@@ -178,6 +178,45 @@ class FlowCoreBindings {
   late final _flow_env_wait =
       _flow_env_waitPtr.asFunction<int Function(FlowEnvHandle)>();
 
+  /// Post a SetInputData call to the env's worker thread pool.
+  ///
+  /// The worker takes the node lock and calls SetInputData(port_key, data,
+  /// compute=true). Returns immediately on the calling thread; the caller may
+  /// release `data` (FFI handle) the moment this returns — the underlying
+  /// SharedNode and SharedNodeData are ref-counted into the worker lambda by
+  /// shared_ptr copy.
+  ///
+  /// Mirrors flow-ui's NodeView::on_input pattern. P1 of FLOW_RUN.html §10.11.
+  ///
+  /// @return FLOW_SUCCESS on accept; FLOW_ERROR_INVALID_HANDLE on a bad env/
+  /// node/data handle; FLOW_ERROR_INVALID_ARGUMENT on null/empty
+  /// port_key.
+  int flow_env_add_task_set_input_data(
+    FlowEnvHandle env,
+    FlowNodeHandle node,
+    ffi.Pointer<ffi.Char> port_key,
+    FlowNodeDataHandle data,
+  ) {
+    return _flow_env_add_task_set_input_data(
+      env,
+      node,
+      port_key,
+      data,
+    );
+  }
+
+  late final _flow_env_add_task_set_input_dataPtr = _lookup<
+      ffi.NativeFunction<
+          ffi.Int32 Function(
+              FlowEnvHandle,
+              FlowNodeHandle,
+              ffi.Pointer<ffi.Char>,
+              FlowNodeDataHandle)>>('flow_env_add_task_set_input_data');
+  late final _flow_env_add_task_set_input_data =
+      _flow_env_add_task_set_input_dataPtr.asFunction<
+          int Function(FlowEnvHandle, FlowNodeHandle, ffi.Pointer<ffi.Char>,
+              FlowNodeDataHandle)>();
+
   ffi.Pointer<ffi.Char> flow_env_get_var(
     FlowEnvHandle env,
     ffi.Pointer<ffi.Char> name,
@@ -1889,10 +1928,10 @@ final class FlowConnectionInfo extends ffi.Struct {
 
 typedef FlowEnvHandle = ffi.Pointer<FlowEnv>;
 typedef FlowNodeFactoryHandle = ffi.Pointer<FlowNodeFactory>;
-typedef FlowGraphHandle = ffi.Pointer<FlowGraph>;
 typedef FlowNodeHandle = ffi.Pointer<FlowNode>;
-typedef FlowConnectionHandle = ffi.Pointer<FlowConnection>;
 typedef FlowNodeDataHandle = ffi.Pointer<FlowNodeData>;
+typedef FlowGraphHandle = ffi.Pointer<FlowGraph>;
+typedef FlowConnectionHandle = ffi.Pointer<FlowConnection>;
 
 final class FlowPortMetadata extends ffi.Struct {
   external ffi.Pointer<ffi.Char> key;

@@ -5,7 +5,9 @@ import 'package:ffi/ffi.dart';
 import '../ffi/bindings.dart';
 import '../ffi/handles.dart';
 import '../utils/error_handler.dart';
+import '../utils/type_converter_simple.dart';
 import 'factory.dart';
+import 'node.dart';
 
 /// Represents the execution environment for flow graphs.
 ///
@@ -77,6 +79,44 @@ class Environment {
     }
 
     return NodeFactory.fromHandle(FactoryHandle(factoryHandle));
+  }
+
+  /// Post a `SetInputData(portKey, data, compute=true)` task to the env's
+  /// worker thread pool. Returns immediately on the calling isolate — the
+  /// actual write + downstream Compute() cascade runs on the worker. Errors
+  /// (a node throwing in its Compute) surface via the per-node `OnError`
+  /// stream, not as a thrown Dart exception.
+  ///
+  /// The flow-core node's `SharedNode` and `SharedNodeData` are ref-counted
+  /// into the worker task by shared_ptr copy on the C++ side — the FFI
+  /// data handle is released here as soon as the symbol returns; the
+  /// backing native data lives until the worker finishes with it.
+  ///
+  /// FLOW_RUN.html §10.11 / P1.
+  ///
+  /// Throws [InvalidArgumentException] on empty [portKey].
+  /// Throws [InvalidHandleException] on a bad env/node handle.
+  /// Does NOT throw on Compute() errors — those surface via `node.onError`.
+  void postSetInputData(Node node, String portKey, dynamic data) {
+    if (portKey.isEmpty) {
+      throw const InvalidArgumentException('Port key cannot be empty');
+    }
+
+    final dataHandle = TypeConverter.toNativeData(data);
+    final cPortKey = portKey.toNativeUtf8();
+
+    try {
+      final result = flowCore.native.flow_env_add_task_set_input_data(
+        _handle.handle,
+        node.handle,
+        cPortKey.cast<Char>(),
+        dataHandle.handle,
+      );
+      ErrorHandler.checkErrorCode(result);
+    } finally {
+      calloc.free(cPortKey);
+      dataHandle.dispose();
+    }
   }
 
   /// Waits for all queued tasks in the thread pool to complete.
