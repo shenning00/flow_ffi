@@ -9,11 +9,9 @@
 
 using namespace flow;
 
-// Wrapper structure for NodeData (forward declaration in node_bridge.cpp)
-struct NodeDataWrapper {
-    SharedNodeData data;
-    NodeDataWrapper(SharedNodeData d) : data(std::move(d)) {}
-};
+// NodeDataWrapper is defined in a shared header for ODR safety across TUs —
+// see node_data_wrapper.hpp for the rationale (mirrors node_wrapper.hpp).
+#include "node_data_wrapper.hpp"
 
 // Helper function to create typed NodeData
 template <typename T>

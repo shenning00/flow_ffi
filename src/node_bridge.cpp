@@ -15,10 +15,8 @@ using namespace flow;
 // definition across all TUs that create or look up node handles.
 #include "node_wrapper.hpp"
 
-struct NodeDataWrapper {
-    SharedNodeData data;
-    NodeDataWrapper(SharedNodeData d) : data(std::move(d)) {}
-};
+// NodeDataWrapper is defined in its own shared header for the same reason.
+#include "node_data_wrapper.hpp"
 
 extern "C" {
 

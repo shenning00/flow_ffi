@@ -9,6 +9,11 @@
 #include "error_handling.hpp"
 #include "handle_manager.hpp"
 
+// Included in preparation for P1 (flow_env_add_task_set_input_data) which
+// will call get_handle<NodeDataWrapper>(data) from this TU.  Bringing the
+// include in now keeps the P1 patch focused on the new symbol body.
+#include "node_data_wrapper.hpp"
+
 using namespace flow;
 
 extern "C" {
