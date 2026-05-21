@@ -675,6 +675,34 @@ class FlowCoreBindings {
       _flow_node_validate_required_inputsPtr
           .asFunction<bool Function(FlowNodeHandle)>();
 
+  int flow_node_start(
+    FlowNodeHandle node,
+  ) {
+    return _flow_node_start(
+      node,
+    );
+  }
+
+  late final _flow_node_startPtr =
+      _lookup<ffi.NativeFunction<ffi.Int32 Function(FlowNodeHandle)>>(
+          'flow_node_start');
+  late final _flow_node_start =
+      _flow_node_startPtr.asFunction<int Function(FlowNodeHandle)>();
+
+  int flow_node_stop(
+    FlowNodeHandle node,
+  ) {
+    return _flow_node_stop(
+      node,
+    );
+  }
+
+  late final _flow_node_stopPtr =
+      _lookup<ffi.NativeFunction<ffi.Int32 Function(FlowNodeHandle)>>(
+          'flow_node_stop');
+  late final _flow_node_stop =
+      _flow_node_stopPtr.asFunction<int Function(FlowNodeHandle)>();
+
   bool flow_node_has_connected_inputs(
     FlowNodeHandle node,
   ) {

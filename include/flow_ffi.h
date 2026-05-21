@@ -200,6 +200,14 @@ FLOW_FFI_EXPORT FlowError flow_node_clear_output_data(FlowNodeHandle node, const
 FLOW_FFI_EXPORT FlowError flow_node_invoke_compute(FlowNodeHandle node);
 FLOW_FFI_EXPORT bool flow_node_validate_required_inputs(FlowNodeHandle node);
 
+// Lifecycle (Start/Stop hooks).  Mirrors flow-core's Node::Start() and
+// Node::Stop().  The framework calls Stop() automatically inside
+// flow_graph_remove_node; Start() is explicitly opt-in by the embedder
+// (flow-ui's convention; see FLOW_RUN.html §10.10).  Default no-op
+// implementations always return FLOW_SUCCESS.  Double-call is safe.
+FLOW_FFI_EXPORT FlowError flow_node_start(FlowNodeHandle node);
+FLOW_FFI_EXPORT FlowError flow_node_stop(FlowNodeHandle node);
+
 // Connection status
 FLOW_FFI_EXPORT bool flow_node_has_connected_inputs(FlowNodeHandle node);
 FLOW_FFI_EXPORT bool flow_node_has_connected_outputs(FlowNodeHandle node);

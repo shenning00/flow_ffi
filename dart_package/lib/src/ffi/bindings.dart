@@ -219,6 +219,12 @@ class FlowCoreBindings {
   int flow_node_invoke_compute(Pointer<bindings.FlowNode> node) =>
       _flowCore.flow_node_invoke_compute(node);
 
+  int flow_node_start(Pointer<bindings.FlowNode> node) =>
+      _flowCore.flow_node_start(node);
+
+  int flow_node_stop(Pointer<bindings.FlowNode> node) =>
+      _flowCore.flow_node_stop(node);
+
   int flow_node_set_input_data(
     Pointer<bindings.FlowNode> node,
     Pointer<Char> portKey,

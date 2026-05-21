@@ -368,6 +368,63 @@ FLOW_FFI_EXPORT bool flow_node_validate_required_inputs(FlowNodeHandle node) {
 }
 
 // ============================================================================
+// Node Lifecycle (Start/Stop hooks)
+// ============================================================================
+
+FLOW_FFI_EXPORT FlowError flow_node_start(FlowNodeHandle node) {
+    FLOW_API_CALL({
+        if (!flow_ffi::validate_handle(node, "node")) {
+            return FLOW_ERROR_INVALID_HANDLE;
+        }
+
+        auto* node_wrapper = flow_ffi::get_handle<NodeWrapper>(node);
+        if (!node_wrapper || !node_wrapper->node) {
+            flow_ffi::ErrorManager::instance().set_error(FLOW_ERROR_INVALID_HANDLE,
+                                                         "Invalid node handle");
+            return FLOW_ERROR_INVALID_HANDLE;
+        }
+
+        // Node::Start() is virtual with an empty default body.  Wrap defensively
+        // because custom subclasses may throw (file handles, threads, etc.).
+        try {
+            node_wrapper->node->Start();
+            return FLOW_SUCCESS;
+        } catch (const std::exception& e) {
+            flow_ffi::ErrorManager::instance().set_error(
+                FLOW_ERROR_UNKNOWN, std::string("Node Start() threw: ") + e.what());
+            return FLOW_ERROR_UNKNOWN;
+        }
+    });
+}
+
+FLOW_FFI_EXPORT FlowError flow_node_stop(FlowNodeHandle node) {
+    FLOW_API_CALL({
+        if (!flow_ffi::validate_handle(node, "node")) {
+            return FLOW_ERROR_INVALID_HANDLE;
+        }
+
+        auto* node_wrapper = flow_ffi::get_handle<NodeWrapper>(node);
+        if (!node_wrapper || !node_wrapper->node) {
+            flow_ffi::ErrorManager::instance().set_error(FLOW_ERROR_INVALID_HANDLE,
+                                                         "Invalid node handle");
+            return FLOW_ERROR_INVALID_HANDLE;
+        }
+
+        // Stop() also has an empty virtual default; flow_graph_remove_node will
+        // call it internally too, so explicit calls before removal are redundant
+        // but safe.
+        try {
+            node_wrapper->node->Stop();
+            return FLOW_SUCCESS;
+        } catch (const std::exception& e) {
+            flow_ffi::ErrorManager::instance().set_error(
+                FLOW_ERROR_UNKNOWN, std::string("Node Stop() threw: ") + e.what());
+            return FLOW_ERROR_UNKNOWN;
+        }
+    });
+}
+
+// ============================================================================
 // Node Connection Status
 // ============================================================================
 

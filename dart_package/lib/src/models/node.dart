@@ -193,6 +193,34 @@ class Node {
     ErrorHandler.checkErrorCode(result);
   }
 
+  /// Invokes the node's lifecycle [Start] hook.
+  ///
+  /// Mirrors flow-core's `Node::Start()`.  Should be called by the embedder
+  /// once after the node has been added to a graph (and after each restored
+  /// node when deserialising a flow file), matching the flow-ui convention.
+  /// The default `Start()` is empty, so this is a no-op for most node types.
+  ///
+  /// Throws [InvalidHandleException] if the node handle is invalid.
+  /// Throws [FlowException] if the node's `Start()` override throws.
+  void start() {
+    final result = flowCore.flow_node_start(_handle.handle);
+    ErrorHandler.checkErrorCode(result);
+  }
+
+  /// Invokes the node's lifecycle [Stop] hook.
+  ///
+  /// Mirrors flow-core's `Node::Stop()`.  Note that `flow_graph_remove_node`
+  /// already calls `Stop()` internally, so this is only needed if you want
+  /// to stop a node without removing it (e.g. pausing background work).
+  /// Calling it manually before `removeNode` is redundant but safe.
+  ///
+  /// Throws [InvalidHandleException] if the node handle is invalid.
+  /// Throws [FlowException] if the node's `Stop()` override throws.
+  void stop() {
+    final result = flowCore.flow_node_stop(_handle.handle);
+    ErrorHandler.checkErrorCode(result);
+  }
+
   /// Sets input data for a specific port.
   ///
   /// [portKey] is the identifier of the input port.
