@@ -330,6 +330,37 @@ class FlowCoreBindings {
   Pointer<Char> flow_data_to_string(Pointer<bindings.FlowNodeData> data) =>
       _flowCore.flow_data_to_string(data);
 
+  // Image data (P10) — see FLOW_RUN.html Appendix B §B.4.
+  // Pointer<Uint8> bytes are unowned views; the caller retains the returned
+  // FlowNodeData handle (which owns the underlying shared_ptr<vector<uint8_t>>).
+
+  Pointer<bindings.FlowNodeData> flow_data_create_image_encoded(
+    Pointer<Uint8> bytes,
+    int length,
+    int width,
+    int height,
+  ) =>
+      _flowCore.flow_data_create_image_encoded(bytes, length, width, height);
+
+  Pointer<bindings.FlowNodeData> flow_data_create_image_raw(
+    Pointer<Uint8> bytes,
+    int width,
+    int height,
+    int rowStrideBytes,
+    int format,
+  ) =>
+      _flowCore.flow_data_create_image_raw(
+          bytes, width, height, rowStrideBytes, format);
+
+  int flow_data_image_borrow(
+    Pointer<bindings.FlowNodeData> data,
+    Pointer<bindings.FlowImageDescriptor> outDesc,
+  ) =>
+      _flowCore.flow_data_image_borrow(data, outDesc);
+
+  bool flow_data_is_image(Pointer<bindings.FlowNodeData> data) =>
+      _flowCore.flow_data_is_image(data);
+
   // Event callback methods
   Pointer<bindings.FlowEventRegistration> flow_graph_on_node_added(
     Pointer<bindings.FlowGraph> graph,

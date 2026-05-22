@@ -1485,6 +1485,84 @@ class FlowCoreBindings {
   late final _flow_data_to_string = _flow_data_to_stringPtr
       .asFunction<ffi.Pointer<ffi.Char> Function(FlowNodeDataHandle)>();
 
+  FlowNodeDataHandle flow_data_create_image_encoded(
+    ffi.Pointer<ffi.Uint8> bytes,
+    int length,
+    int width,
+    int height,
+  ) {
+    return _flow_data_create_image_encoded(
+      bytes,
+      length,
+      width,
+      height,
+    );
+  }
+
+  late final _flow_data_create_image_encodedPtr = _lookup<
+      ffi.NativeFunction<
+          FlowNodeDataHandle Function(ffi.Pointer<ffi.Uint8>, ffi.Size,
+              ffi.Int32, ffi.Int32)>>('flow_data_create_image_encoded');
+  late final _flow_data_create_image_encoded =
+      _flow_data_create_image_encodedPtr.asFunction<
+          FlowNodeDataHandle Function(ffi.Pointer<ffi.Uint8>, int, int, int)>();
+
+  FlowNodeDataHandle flow_data_create_image_raw(
+    ffi.Pointer<ffi.Uint8> bytes,
+    int width,
+    int height,
+    int row_stride_bytes,
+    int format,
+  ) {
+    return _flow_data_create_image_raw(
+      bytes,
+      width,
+      height,
+      row_stride_bytes,
+      format,
+    );
+  }
+
+  late final _flow_data_create_image_rawPtr = _lookup<
+      ffi.NativeFunction<
+          FlowNodeDataHandle Function(ffi.Pointer<ffi.Uint8>, ffi.Int32,
+              ffi.Int32, ffi.Int32, ffi.Int32)>>('flow_data_create_image_raw');
+  late final _flow_data_create_image_raw =
+      _flow_data_create_image_rawPtr.asFunction<
+          FlowNodeDataHandle Function(
+              ffi.Pointer<ffi.Uint8>, int, int, int, int)>();
+
+  int flow_data_image_borrow(
+    FlowNodeDataHandle data,
+    ffi.Pointer<FlowImageDescriptor> out_desc,
+  ) {
+    return _flow_data_image_borrow(
+      data,
+      out_desc,
+    );
+  }
+
+  late final _flow_data_image_borrowPtr = _lookup<
+      ffi.NativeFunction<
+          ffi.Int32 Function(FlowNodeDataHandle,
+              ffi.Pointer<FlowImageDescriptor>)>>('flow_data_image_borrow');
+  late final _flow_data_image_borrow = _flow_data_image_borrowPtr.asFunction<
+      int Function(FlowNodeDataHandle, ffi.Pointer<FlowImageDescriptor>)>();
+
+  bool flow_data_is_image(
+    FlowNodeDataHandle data,
+  ) {
+    return _flow_data_is_image(
+      data,
+    );
+  }
+
+  late final _flow_data_is_imagePtr =
+      _lookup<ffi.NativeFunction<ffi.Bool Function(FlowNodeDataHandle)>>(
+          'flow_data_is_image');
+  late final _flow_data_is_image =
+      _flow_data_is_imagePtr.asFunction<bool Function(FlowNodeDataHandle)>();
+
   void flow_free_string(
     ffi.Pointer<ffi.Char> str,
   ) {
@@ -1943,6 +2021,40 @@ final class FlowPortMetadata extends ffi.Struct {
 }
 
 typedef FlowModuleHandle = ffi.Pointer<FlowModule>;
+
+abstract class FlowImageKind {
+  static const int FLOW_IMAGE_KIND_ENCODED = 0;
+  static const int FLOW_IMAGE_KIND_RAW_RGBA = 1;
+}
+
+abstract class FlowPixelFormat {
+  static const int FLOW_PIXEL_FORMAT_RGBA8888 = 0;
+}
+
+final class FlowImageDescriptor extends ffi.Struct {
+  @ffi.Int32()
+  external int kind;
+
+  @ffi.Int32()
+  external int format;
+
+  @ffi.Int32()
+  external int width;
+
+  @ffi.Int32()
+  external int height;
+
+  @ffi.Int32()
+  external int row_stride_bytes;
+
+  external ffi.Pointer<ffi.Uint8> bytes;
+
+  @ffi.Size()
+  external int bytes_length;
+
+  @ffi.Uint64()
+  external int content_version;
+}
 
 final class FlowEventRegistration extends ffi.Opaque {}
 
