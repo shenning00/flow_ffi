@@ -13,10 +13,21 @@ using namespace flow;
 // see node_data_wrapper.hpp for the rationale (mirrors node_wrapper.hpp).
 #include "node_data_wrapper.hpp"
 
-// Helper function to create typed NodeData
+// Helper function to create typed NodeData.
+//
+// Constructs the LEAF `flow::NodeData<T>`, not the base
+// `flow::detail::NodeData<T>`. Node authors typically read input values via
+// the typed shorthand `node.GetInputData<T>(key)`, which does a
+// dynamic_pointer_cast to `flow::NodeData<T>`. Producing the base type here
+// makes that cast return null and any `Compute()` that uses the shorthand
+// silently early-returns, killing the cascade.
+//
+// See flutter_fl_nodes/FFI_DATA_TYPE_MISMATCH.md for the diagnostic story
+// and the audit of read-side static_casts (they remain correct because the
+// leaf IS-A the base).
 template <typename T>
 SharedNodeData CreateTypedData(const T& value) {
-    return std::make_shared<detail::NodeData<T>>(value);
+    return std::make_shared<NodeData<T>>(value);
 }
 
 extern "C" {

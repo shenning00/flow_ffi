@@ -27,6 +27,8 @@
 
 #include <gtest/gtest.h>
 
+#include <cstdlib>
+#include <fstream>
 #include <memory>
 #include <string>
 
@@ -317,15 +319,213 @@ TEST_F(EnvAddTaskSetInputDataTest, DataHandleReleasedBeforeLambdaRuns_ComputeSti
 }
 
 // ============================================================================
-// (5) Cascade (A→B graph) — deferred.
+// (5) Cascade (A→B graph) — drives the full propagation chain end-to-end:
 //
-// TODO(P1): Wire a two-node A→B chain via flow_graph_connect_nodes where
-// DoublerNode A's "result" port feeds DoublerNode B's "value" port.  Post to
-// A's "value", wait, assert B's "result" == input * 4.
+//     post.setInputData(A.value, 5)
+//       └→ AddTask(SetInputData(A.value, 5, compute=true))
+//          └→ A.InvokeCompute() → A.Compute() doubles 5 → SetOutputData(A.result, 10)
+//             └→ EmitUpdate(A.result, 10)
+//                └→ _propagate_output_update → Graph::PropagateConnectionsData
+//                   └→ for each connection from A.result: AddTask(...)
+//                      └→ SetInputData(B.value, 10) (compute=true default)
+//                         └→ B.InvokeCompute() → B.Compute() doubles 10
+//                            → SetOutputData(B.result, 20)
 //
-// This requires the graph layer to propagate SetOutputData events through
-// connected ports (EmitUpdate / _propagate_output_update), which works at the
-// C++ graph level but the FFI test would need to verify it end-to-end without
-// a module providing the connection plumbing.  Deferred to the Dart-side
-// widget integration tests (see FLOW_RUN.html §10.11 "Tests").
+// Reproduces the user-visible setup (Dart bridge ↔ test_module nodes) at the
+// C++ level. If this passes but the Flutter app still doesn't cascade, the
+// issue is on the Dart/Flutter side (test_module node config, bridge wiring,
+// module loader). If it fails, the cascade is broken at the C++ level and the
+// failure here narrows the bug.
 // ============================================================================
+
+TEST_F(EnvAddTaskSetInputDataTest, Cascade_AtoB_DoublesTwice) {
+    // Add A and B (both DoublerNodes), then connect A.result → B.value.
+    FlowNodeHandle node_a = add_doubler("d_a");
+    FlowNodeHandle node_b = add_doubler("d_b");
+    ASSERT_NE(node_a, nullptr);
+    ASSERT_NE(node_b, nullptr);
+
+    const char* a_id = flow_node_get_id(node_a);
+    const char* b_id = flow_node_get_id(node_b);
+    ASSERT_NE(a_id, nullptr);
+    ASSERT_NE(b_id, nullptr);
+
+    // Take owned copies — flow_node_get_id may return a pointer into a
+    // single rotating buffer that gets overwritten by the second call.
+    std::string a_id_str = a_id;
+    std::string b_id_str = b_id;
+
+    FlowConnectionHandle conn = flow_graph_connect_nodes(
+        graph_handle_, a_id_str.c_str(), "result", b_id_str.c_str(), "value");
+    ASSERT_NE(conn, nullptr)
+        << "flow_graph_connect_nodes failed — last_error: "
+        << (flow_get_last_error() ? flow_get_last_error() : "(none)");
+
+    // Post 5 to A.value via the new symbol.  No flow_graph_run() — the
+    // cascade is the whole point of the test; if it works, we don't need
+    // to manually kick anything.
+    FlowNodeDataHandle in_h = make_int_data(5);
+    ASSERT_NE(in_h, nullptr);
+    EXPECT_EQ(flow_env_add_task_set_input_data(
+                  env_handle_, node_a, "value", in_h),
+              FLOW_SUCCESS);
+
+    flow_release_handle(in_h);
+    in_h = nullptr;
+
+    // Drain the whole cascade — the chain may queue multiple tasks before it
+    // settles.
+    EXPECT_EQ(flow_env_wait(env_handle_), FLOW_SUCCESS);
+
+    // A.result should be 10 (5 * 2).
+    FlowNodeDataHandle out_a = flow_node_get_output_data(node_a, "result");
+    ASSERT_NE(out_a, nullptr)
+        << "A.result should be populated after the kicked compute";
+    int32_t a_val = 0;
+    ASSERT_EQ(flow_data_get_int(out_a, &a_val), FLOW_SUCCESS);
+    EXPECT_EQ(a_val, 10) << "A should have doubled the input (5 * 2 == 10)";
+    flow_release_handle(out_a);
+
+    // B.result should be 20 (10 * 2) IF the cascade propagated.
+    // If B is null or 0, the cascade did not reach B — that's the diagnostic.
+    FlowNodeDataHandle out_b = flow_node_get_output_data(node_b, "result");
+    ASSERT_NE(out_b, nullptr)
+        << "B.result is missing — cascade did NOT reach B. "
+           "Either PropagateConnectionsData didn't enqueue a task for the "
+           "A.result → B.value connection, or the queued task threw silently. "
+           "Check Graph::PropagateConnectionsData and Connections::FindConnections.";
+    int32_t b_val = 0;
+    ASSERT_EQ(flow_data_get_int(out_b, &b_val), FLOW_SUCCESS);
+    EXPECT_EQ(b_val, 20)
+        << "B should have doubled A's output (10 * 2 == 20). "
+           "Got " << b_val << " — the cascade fired but B saw the wrong input.";
+    flow_release_handle(out_b);
+}
+
+// ============================================================================
+// (6) Cascade via module-loaded nodes — repros the exact Flutter scenario.
+//
+// Loads test_module.fmod (built from flutter_fl_nodes/examples/...) and runs
+// PassthroughStringNode → DisplayStringNode through the same FFI path the
+// Flutter bridge uses. If this passes but the running app doesn't cascade,
+// the bug is squarely on the Dart/Flutter side (event delivery, bridge
+// wiring). If it fails, the bug is specific to module-loaded node classes.
+//
+// The .fmod path is hard-coded to the flutter_fl_nodes fixture — if the
+// file is missing (CI, fresh checkout without test_module built), the test
+// is GTEST_SKIPped, not failed.
+// ============================================================================
+
+namespace {
+constexpr const char* kTestModuleFmodPath =
+    "/Users/shenning/Development/flow/flutter_fl_nodes/examples/fl_nodes_example/"
+    "test/fixtures/test_module/build/test_module.fmod";
+}
+
+TEST_F(EnvAddTaskSetInputDataTest, Cascade_AtoB_ModuleLoaded_StringChain) {
+    // Skip cleanly if the fixture isn't built — the test is a flutter_fl_nodes
+    // artifact, not part of flow_ffi's own build.
+    {
+        std::ifstream probe(kTestModuleFmodPath);
+        if (!probe.good()) {
+            GTEST_SKIP() << "test_module.fmod not found at "
+                         << kTestModuleFmodPath
+                         << " — build the fixture first (cmake --build "
+                            "flutter_fl_nodes/examples/.../test_module/build).";
+        }
+    }
+
+    // Load the module and register its node classes with the factory the
+    // fixture already created.
+    FlowModuleHandle module = flow_module_create(factory_handle_);
+    ASSERT_NE(module, nullptr);
+
+    ASSERT_EQ(flow_module_load(module, kTestModuleFmodPath), FLOW_SUCCESS)
+        << "Failed to load test_module.fmod — last_error: "
+        << (flow_get_last_error() ? flow_get_last_error() : "(none)");
+    ASSERT_TRUE(flow_module_is_loaded(module));
+
+    ASSERT_EQ(flow_module_register_nodes(module), FLOW_SUCCESS)
+        << "Failed to register module nodes — last_error: "
+        << (flow_get_last_error() ? flow_get_last_error() : "(none)");
+
+    // Create A (PassthroughStringNode) and B (DisplayStringNode). These are
+    // the exact two node types the user is chaining in the running app.
+    FlowNodeHandle node_a =
+        flow_graph_add_node(graph_handle_, "PassthroughStringNode", "passthrough_a");
+    FlowNodeHandle node_b =
+        flow_graph_add_node(graph_handle_, "DisplayStringNode", "display_b");
+    ASSERT_NE(node_a, nullptr)
+        << "flow_graph_add_node('PassthroughStringNode') failed — last_error: "
+        << (flow_get_last_error() ? flow_get_last_error() : "(none)");
+    ASSERT_NE(node_b, nullptr)
+        << "flow_graph_add_node('DisplayStringNode') failed — last_error: "
+        << (flow_get_last_error() ? flow_get_last_error() : "(none)");
+
+    // Snapshot the UUIDs before any subsequent flow_node_get_id call clobbers
+    // the shared return buffer.
+    const char* a_id_raw = flow_node_get_id(node_a);
+    ASSERT_NE(a_id_raw, nullptr);
+    std::string a_id = a_id_raw;
+    const char* b_id_raw = flow_node_get_id(node_b);
+    ASSERT_NE(b_id_raw, nullptr);
+    std::string b_id = b_id_raw;
+
+    // Connect A.result → B.value (same connection shape the user makes).
+    FlowConnectionHandle conn = flow_graph_connect_nodes(
+        graph_handle_, a_id.c_str(), "result", b_id.c_str(), "value");
+    ASSERT_NE(conn, nullptr)
+        << "flow_graph_connect_nodes failed — last_error: "
+        << (flow_get_last_error() ? flow_get_last_error() : "(none)");
+
+    // Post "hello" to A.value via the new symbol.
+    FlowNodeDataHandle in_h = flow_data_create_string("hello");
+    ASSERT_NE(in_h, nullptr);
+    EXPECT_EQ(flow_env_add_task_set_input_data(
+                  env_handle_, node_a, "value", in_h),
+              FLOW_SUCCESS);
+
+    flow_release_handle(in_h);
+    in_h = nullptr;
+
+    // Drain the cascade.
+    EXPECT_EQ(flow_env_wait(env_handle_), FLOW_SUCCESS);
+
+    // A.result should be "hello" (PassthroughString just echoes input).
+    FlowNodeDataHandle out_a = flow_node_get_output_data(node_a, "result");
+    ASSERT_NE(out_a, nullptr)
+        << "A.result missing — PassthroughStringNode.Compute did not fire "
+           "OR did not call SetOutputData. Most likely SetInputData on the "
+           "worker thread isn't triggering InvokeCompute for module-loaded "
+           "nodes.";
+    char* a_str = nullptr;
+    ASSERT_EQ(flow_data_get_string(out_a, &a_str), FLOW_SUCCESS);
+    ASSERT_NE(a_str, nullptr);
+    EXPECT_STREQ(a_str, "hello") << "A.result has wrong value";
+    std::free(a_str);
+    flow_release_handle(out_a);
+
+    // B.result should be "hello" too IF the cascade propagated.
+    FlowNodeDataHandle out_b = flow_node_get_output_data(node_b, "result");
+    ASSERT_NE(out_b, nullptr)
+        << "*** CASCADE DID NOT REACH B ***\n"
+           "B.result is null — the A→B propagation did NOT fire. Same "
+           "symptom as the Flutter app's '(no value)'. The cascade works "
+           "for inline-defined DoublerNode (see Cascade_AtoB_DoublesTwice) "
+           "but NOT for module-loaded nodes — the bug is in how module "
+           "nodes register or in how their EmitUpdate path interacts with "
+           "Graph::PropagateConnectionsData. Investigate the module-loader "
+           "AddNode path vs. the in-process Graph::AddNode path.";
+    char* b_str = nullptr;
+    ASSERT_EQ(flow_data_get_string(out_b, &b_str), FLOW_SUCCESS);
+    ASSERT_NE(b_str, nullptr);
+    EXPECT_STREQ(b_str, "hello")
+        << "B.result has wrong value — cascade fired but B saw wrong input.";
+    std::free(b_str);
+    flow_release_handle(out_b);
+
+    // Clean up the loaded module before the fixture tears down the factory.
+    flow_module_unregister_nodes(module);
+    flow_module_unload(module);
+    flow_module_destroy(module);
+}
