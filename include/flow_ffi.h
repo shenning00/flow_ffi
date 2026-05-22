@@ -379,6 +379,63 @@ FLOW_FFI_EXPORT void flow_data_destroy(FlowNodeDataHandle data);
 FLOW_FFI_EXPORT const char* flow_data_to_string(FlowNodeDataHandle data);
 
 // ============================================================================
+// Image Data (P10 — FLOW_RUN.html Appendix B §B.4)
+// ============================================================================
+
+// Storage kind for an image payload.
+typedef enum FlowImageKind {
+    FLOW_IMAGE_KIND_ENCODED  = 0, // PNG/JPEG/etc. byte stream
+    FLOW_IMAGE_KIND_RAW_RGBA = 1, // tightly packed or strided RGBA8, top-left origin
+} FlowImageKind;
+
+// Pixel format for RAW images.  v1 supports RGBA8888 only; enum is
+// provisioned with room for BGRA/RGB/GRAY without breaking the ABI.
+typedef enum FlowPixelFormat {
+    FLOW_PIXEL_FORMAT_RGBA8888 = 0, // 4 bytes per pixel
+} FlowPixelFormat;
+
+// Read-only descriptor populated by flow_data_image_borrow.  The bytes
+// pointer is owned by the originating FlowNodeDataHandle and remains
+// valid only until flow_data_destroy is called on that handle.
+typedef struct FlowImageDescriptor {
+    FlowImageKind   kind;
+    FlowPixelFormat format;            // ignored for ENCODED
+    int32_t         width;
+    int32_t         height;
+    int32_t         row_stride_bytes;  // == width*4 if tightly packed (RAW only)
+    const uint8_t*  bytes;             // owned by the C++ side
+    size_t          bytes_length;
+    uint64_t        content_version;   // monotonic; used by the Dart coalescer to dedup
+} FlowImageDescriptor;
+
+// Create an image-bearing FlowNodeData (encoded blob: PNG, JPEG, etc.).
+// Bytes are copied into a refcounted shared_ptr<vector<uint8_t>> inside the
+// returned handle.  width/height may be -1 ("unknown — resolve at decode").
+FLOW_FFI_EXPORT FlowNodeDataHandle flow_data_create_image_encoded(
+    const uint8_t* bytes, size_t length,
+    int32_t width, int32_t height);
+
+// Create an image-bearing FlowNodeData (raw RGBA8).  Bytes are copied into
+// a refcounted shared_ptr<vector<uint8_t>> inside the returned handle.
+// row_stride_bytes must be >= width * 4 (tightly packed when ==).
+FLOW_FFI_EXPORT FlowNodeDataHandle flow_data_create_image_raw(
+    const uint8_t* bytes,
+    int32_t width, int32_t height,
+    int32_t row_stride_bytes,
+    FlowPixelFormat format);
+
+// Borrow a read-only descriptor for an image-bearing FlowNodeData.  The
+// `bytes` pointer in `out_desc` is a view into the C++ side and is valid
+// until flow_data_destroy is called on the handle.  Returns
+// FLOW_ERROR_TYPE_MISMATCH when the handle does not carry a flow::Image.
+FLOW_FFI_EXPORT FlowError flow_data_image_borrow(
+    FlowNodeDataHandle data, FlowImageDescriptor* out_desc);
+
+// Cheap predicate — does this NodeData carry a flow::Image?  Safe to call
+// on any handle; returns false for null/invalid handles.
+FLOW_FFI_EXPORT bool flow_data_is_image(FlowNodeDataHandle data);
+
+// ============================================================================
 // Memory Management Helpers
 // ============================================================================
 

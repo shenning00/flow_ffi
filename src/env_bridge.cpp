@@ -7,6 +7,7 @@
 #include <cstring>
 #include <string>
 
+#include "builtin_nodes/preview_node.hpp"
 #include "env_wrapper.hpp"
 #include "error_handling.hpp"
 #include "handle_manager.hpp"
@@ -37,6 +38,11 @@ FLOW_FFI_EXPORT FlowEnvHandle flow_env_create(int32_t max_threads) {
 
         // Create environment
         auto env = Env::Create(factory, settings);
+
+        // Register built-in node classes (P10).  The "Editor.Preview" class
+        // matches flow-ui's RegisterNodeClass<PreviewNode>("Editor", "Preview")
+        // so persisted flows round-trip across editors.
+        factory->RegisterNodeClass<flow::ffi::builtin::PreviewNode>("Editor", "Preview");
 
         // Create wrapper and handle
         auto wrapper = EnvWrapper(env);

@@ -2,10 +2,12 @@
 
 #include <flow/core/Node.hpp>
 #include <flow/core/NodeData.hpp>
+#include <flow/core/TypeName.hpp>
 
 #include <cstring>
 
 #include "error_handling.hpp"
+#include "flow_image.hpp"
 #include "handle_manager.hpp"
 #include <nlohmann/json.hpp>
 
@@ -798,6 +800,11 @@ std::string MapTypeToInterworkingType(std::string_view flow_type) {
         return "boolean";
     } else if (flow_type == "std::string" || flow_type == "string" || flow_type == "const char*") {
         return "string";
+    } else if (flow_type == TypeName_v<flow::Image>) {
+        // P10 — image-bearing ports show as "image" in persisted graphs and
+        // in the Dart compatibility-check.  Pixel bytes are never inlined
+        // into the JSON; the value field is omitted (see CreateInterworkingJson).
+        return "image";
     }
 
     // Default to "none" for complex types
@@ -814,8 +821,11 @@ std::string CreateInterworkingJson(const SharedPort& port) {
 
     j["type"] = interworking_type;
 
-    // If port has default data and it's an editable type, include the value
-    if (interworking_type != "none" && port->GetData()) {
+    // If port has default data and it's an editable type, include the value.
+    // Image ports never serialise binary payloads — bytes are kilobytes-to-
+    // megabytes and would bloat persisted graphs (FLOW_RUN.html R22).
+    const bool include_value = interworking_type != "none" && interworking_type != "image";
+    if (include_value && port->GetData()) {
         try {
             std::string value_str = port->GetData()->ToString();
             j["value"] = value_str;
