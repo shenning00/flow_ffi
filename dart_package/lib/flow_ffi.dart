@@ -18,6 +18,19 @@ export 'src/utils/error_handler.dart';
 export 'src/utils/type_converter_simple.dart';
 export 'src/utils/event_manager.dart';
 
+// FFI bridge surface — exposed so downstream packages (e.g. fl_nodes_core)
+// can name NodeDataHandle in public APIs and call image / data FFI helpers
+// via [flowCore].  Internal layout of these files is still considered
+// implementation detail; only the named exports listed here are stable.
+export 'src/ffi/handles.dart' show NodeDataHandle, HandleWrapper;
+export 'src/ffi/bindings.dart' show FlowCoreBindings, flowCore;
+export 'src/ffi/bindings_generated.dart'
+    show
+        FlowImageDescriptor,
+        FlowImageKind,
+        FlowPixelFormat,
+        FlowNodeData;
+
 // Services
 export 'src/services/flow_service.dart';
 export 'src/services/graph_builder.dart';
