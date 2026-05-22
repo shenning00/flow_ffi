@@ -38,6 +38,8 @@ add_library(flow_ffi SHARED
     src/type_conversions.cpp
     # Phase 5: Event System
     src/event_bridge.cpp
+    # P10: Image primitives & built-in PreviewNode
+    src/image_bridge.cpp
 )
 
 # Include directories

@@ -1,6 +1,7 @@
 #include "flow_ffi.h"
 
 #include <cstring>
+#include <string>
 #include <thread>
 
 #include "error_handling.hpp"
@@ -161,14 +162,24 @@ TEST_F(EnvFactoryTest, GetCategories) {
     FlowNodeFactoryHandle factory = flow_env_get_factory(env);
     ASSERT_NE(factory, nullptr);
 
-    // Get categories (should be empty for new factory)
+    // A fresh factory carries the P10 built-ins ("Editor" category for
+    // PreviewNode).  External modules / .flowmod loads will add more.
     char** categories = nullptr;
     size_t count = 0;
 
     FlowError result = flow_factory_get_categories(factory, &categories, &count);
     EXPECT_EQ(result, FLOW_SUCCESS);
-    EXPECT_EQ(count, 0);
-    EXPECT_EQ(categories, nullptr);
+    ASSERT_GE(count, 1u);
+    ASSERT_NE(categories, nullptr);
+
+    bool found_editor = false;
+    for (size_t i = 0; i < count; ++i) {
+        if (categories[i] && std::string(categories[i]) == "Editor") {
+            found_editor = true;
+        }
+    }
+    EXPECT_TRUE(found_editor) << "Expected 'Editor' category for built-in PreviewNode";
+    flow_free_string_array(categories, count);
 
     // Clean up
     flow_release_handle(factory);
