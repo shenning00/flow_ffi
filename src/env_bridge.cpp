@@ -7,6 +7,7 @@
 #include <cstring>
 #include <string>
 
+#include "builtin_nodes/image_open_node.hpp"
 #include "builtin_nodes/preview_node.hpp"
 #include "env_wrapper.hpp"
 #include "error_handling.hpp"
@@ -43,6 +44,13 @@ FLOW_FFI_EXPORT FlowEnvHandle flow_env_create(int32_t max_threads) {
         // matches flow-ui's RegisterNodeClass<PreviewNode>("Editor", "Preview")
         // so persisted flows round-trip across editors.
         factory->RegisterNodeClass<flow::ffi::builtin::PreviewNode>("Editor", "Preview");
+
+        // P11 follow-up — built-in source node that opens an image file
+        // from a path string and emits an Encoded flow::Image.  Lets the
+        // editor stand up a load-and-preview pipeline with no .flowmod
+        // fixture.  See builtin_nodes/image_open_node.hpp.
+        factory->RegisterNodeClass<flow::ffi::builtin::ImageOpenNode>(
+            "Editor", "ImageOpen");
 
         // Create wrapper and handle
         auto wrapper = EnvWrapper(env);
