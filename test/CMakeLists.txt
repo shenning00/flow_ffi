@@ -48,6 +48,7 @@ add_executable(flow_ffi_tests
     test_node_lifecycle.cpp
     test_env_add_task_set_input_data.cpp
     test_p10_image_primitives.cpp
+    test_image_open_node.cpp
 )
 
 # Link libraries

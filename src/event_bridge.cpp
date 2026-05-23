@@ -5,6 +5,7 @@
 
 #include "error_handling.hpp"
 #include "handle_manager.hpp"
+#include "node_data_wrapper.hpp"
 #include "node_wrapper.hpp"
 
 // Include flow-core headers
@@ -372,7 +373,15 @@ flow_node_on_set_input(FlowNodeHandle node, FlowNodeDataEventCallback callback, 
             reg->event_id,
             [callback, user_data, node](const IndexableName& port_key, const SharedNodeData& data) {
                 // Convert data to handle
-                auto data_handle = flow_ffi::create_handle<SharedNodeData>(data);
+                // Wrap the SharedNodeData in a NodeDataWrapper so downstream
+                // accessors like flow_data_is_image / flow_data_image_borrow
+                // (and the existing flow_data_get_* family) succeed on this
+                // handle.  The rest of the FFI surface treats NodeDataWrapper
+                // as the canonical handle wrapper; using a raw SharedNodeData
+                // here previously caused get_handle<NodeDataWrapper> to
+                // dynamic_cast to null, masking real images as "not image"
+                // when they crossed the event boundary.
+                auto data_handle = flow_ffi::create_handle<NodeDataWrapper>(NodeDataWrapper(data));
                 // Ownership transferred to caller; Dart frees via flow_free_string.
                 callback(node, dup_cstr(port_key.name()), static_cast<FlowNodeDataHandle>(data_handle),
                          user_data);
@@ -409,7 +418,15 @@ flow_node_on_set_output(FlowNodeHandle node, FlowNodeDataEventCallback callback,
             reg->event_id,
             [callback, user_data, node](const IndexableName& port_key, const SharedNodeData& data) {
                 // Convert data to handle
-                auto data_handle = flow_ffi::create_handle<SharedNodeData>(data);
+                // Wrap the SharedNodeData in a NodeDataWrapper so downstream
+                // accessors like flow_data_is_image / flow_data_image_borrow
+                // (and the existing flow_data_get_* family) succeed on this
+                // handle.  The rest of the FFI surface treats NodeDataWrapper
+                // as the canonical handle wrapper; using a raw SharedNodeData
+                // here previously caused get_handle<NodeDataWrapper> to
+                // dynamic_cast to null, masking real images as "not image"
+                // when they crossed the event boundary.
+                auto data_handle = flow_ffi::create_handle<NodeDataWrapper>(NodeDataWrapper(data));
                 // Ownership transferred to caller; Dart frees via flow_free_string.
                 callback(node, dup_cstr(port_key.name()), static_cast<FlowNodeDataHandle>(data_handle),
                          user_data);
