@@ -23,6 +23,12 @@ find_package(flow-core REQUIRED CONFIG)
 
 message(STATUS "Found flow-core package")
 
+# flow_wire: interwork layer that owns the canonical flow::Image wire type
+# and the generic source/sink nodes that produce/consume it (ImageOpenNode,
+# PreviewNode), plus optionally compiled cv::Mat adapter nodes.  Lives as a
+# sibling directory; built as a static library and absorbed into flow_ffi.so.
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../flow_wire ${CMAKE_CURRENT_BINARY_DIR}/flow_wire)
+
 # Create shared library
 add_library(flow_ffi SHARED
     src/flow_ffi.cpp
@@ -57,6 +63,7 @@ target_include_directories(flow_ffi
 target_link_libraries(flow_ffi
     PUBLIC
         flow-core::flow-core
+        flow_wire
 )
 
 # Platform-specific link options
