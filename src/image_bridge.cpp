@@ -11,8 +11,9 @@
 #include <utility>
 #include <vector>
 
+#include <flow_wire/Image.hpp>
+
 #include "error_handling.hpp"
-#include "flow_image.hpp"
 #include "handle_manager.hpp"
 #include "node_data_wrapper.hpp"
 

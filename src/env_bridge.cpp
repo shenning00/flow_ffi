@@ -7,8 +7,8 @@
 #include <cstring>
 #include <string>
 
-#include "builtin_nodes/image_open_node.hpp"
-#include "builtin_nodes/preview_node.hpp"
+#include <flow_wire/Register.hpp>
+
 #include "env_wrapper.hpp"
 #include "error_handling.hpp"
 #include "handle_manager.hpp"
@@ -40,17 +40,11 @@ FLOW_FFI_EXPORT FlowEnvHandle flow_env_create(int32_t max_threads) {
         // Create environment
         auto env = Env::Create(factory, settings);
 
-        // Register built-in node classes (P10).  The "Editor.Preview" class
-        // matches flow-ui's RegisterNodeClass<PreviewNode>("Editor", "Preview")
-        // so persisted flows round-trip across editors.
-        factory->RegisterNodeClass<flow::ffi::builtin::PreviewNode>("Editor", "Preview");
-
-        // P11 follow-up — built-in source node that opens an image file
-        // from a path string and emits an Encoded flow::Image.  Lets the
-        // editor stand up a load-and-preview pipeline with no .flowmod
-        // fixture.  See builtin_nodes/image_open_node.hpp.
-        factory->RegisterNodeClass<flow::ffi::builtin::ImageOpenNode>(
-            "Editor", "ImageOpen");
+        // Register the wire-type builtin nodes (ImageOpenNode, PreviewNode)
+        // and any optionally-compiled adapter nodes (cv::Mat ↔ flow::Image
+        // when FLOW_INTERWORK_WITH_OPENCV is set in the flow_wire build).
+        // See flow_wire/Register.hpp.
+        flow_wire::RegisterAllNodes(*env);
 
         // Create wrapper and handle
         auto wrapper = EnvWrapper(env);

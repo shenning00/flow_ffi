@@ -6,8 +6,9 @@
 
 #include <cstring>
 
+#include <flow_wire/Image.hpp>
+
 #include "error_handling.hpp"
-#include "flow_image.hpp"
 #include "handle_manager.hpp"
 #include <nlohmann/json.hpp>
 
@@ -146,7 +147,12 @@ FLOW_FFI_EXPORT FlowError flow_node_set_input_data(FlowNodeHandle node, const ch
 
         try {
             IndexableName key(port_key);
-            node_wrapper->node->SetInputData(key, data_wrapper->data, false); // Don't auto-compute
+            // Use flow-core's `compute=true` default so a value written from
+            // the binding side immediately cascades through downstream nodes.
+            // The previous explicit `false` here suppressed the cascade and
+            // left interactive editors (e.g. ImageOpen's path field) appearing
+            // inert — the value landed in the port but no Compute() fired.
+            node_wrapper->node->SetInputData(key, data_wrapper->data);
             return FLOW_SUCCESS;
         } catch (const std::out_of_range&) {
             flow_ffi::ErrorManager::instance().set_error(
@@ -798,7 +804,16 @@ std::string MapTypeToInterworkingType(std::string_view flow_type) {
         return "float";
     } else if (flow_type == "bool") {
         return "boolean";
-    } else if (flow_type == "std::string" || flow_type == "string" || flow_type == "const char*") {
+    } else if (flow_type == TypeName_v<std::string> ||
+               flow_type == "std::string" ||
+               flow_type == "string" ||
+               flow_type == "const char*") {
+        // TypeName_v<std::string> resolves to the compiler-derived form
+        // (e.g. "std::__cxx11::basic_string<char, std::char_traits<char>,
+        // std::allocator<char> >" under libstdc++), which is what the port
+        // actually stores via NodeData<T>::Type() — so the literal "std::string"
+        // alone never matched.  The literal forms are retained as fallbacks
+        // for nodes that pass alternative type-name strings explicitly.
         return "string";
     } else if (flow_type == TypeName_v<flow::Image>) {
         // P10 — image-bearing ports show as "image" in persisted graphs and
