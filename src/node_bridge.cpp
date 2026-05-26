@@ -7,6 +7,9 @@
 #include <cstring>
 
 #include <flow_wire/Image.hpp>
+#if FLOW_FFI_HAS_CUDA
+#include <flow_wire/CudaDeviceImage.hpp>
+#endif
 
 #include "error_handling.hpp"
 #include "handle_manager.hpp"
@@ -796,11 +799,31 @@ flow_node_get_port_description(FlowNodeHandle node, const char* port_key, bool i
 namespace {
 // Helper function to map flow-core type strings to interworking types
 std::string MapTypeToInterworkingType(std::string_view flow_type) {
-    // Check for common primitive types
+    // Check for common primitive types.
+    //
+    // For integer types we have to compare against both the literal type names
+    // (used by some hand-written nodes) AND the TypeName_v<…> compiler-derived
+    // form (returned by AddOutput<T>'s default flow-core path).  On gcc/clang
+    // x86_64 Linux, TypeName_v<int64_t> resolves to "long" (since int64_t is
+    // typedef'd to long int), so the literal "int64_t" check alone fails for
+    // ports declared as int64_t.  Same root cause as the std::string fallback
+    // a few lines below.
     if (flow_type == "int" || flow_type == "int32_t" || flow_type == "int64_t" ||
-        flow_type == "uint32_t" || flow_type == "uint64_t" || flow_type == "size_t") {
+        flow_type == "uint32_t" || flow_type == "uint64_t" || flow_type == "size_t" ||
+        flow_type == TypeName_v<int> ||
+        flow_type == TypeName_v<int32_t> ||
+        flow_type == TypeName_v<int64_t> ||
+        flow_type == TypeName_v<uint32_t> ||
+        flow_type == TypeName_v<uint64_t> ||
+        flow_type == TypeName_v<size_t> ||
+        flow_type == TypeName_v<long> ||
+        flow_type == TypeName_v<long long> ||
+        flow_type == TypeName_v<unsigned long> ||
+        flow_type == TypeName_v<unsigned long long>) {
         return "integer";
-    } else if (flow_type == "float" || flow_type == "double") {
+    } else if (flow_type == "float" || flow_type == "double" ||
+               flow_type == TypeName_v<float> ||
+               flow_type == TypeName_v<double>) {
         return "float";
     } else if (flow_type == "bool") {
         return "boolean";
@@ -820,6 +843,12 @@ std::string MapTypeToInterworkingType(std::string_view flow_type) {
         // in the Dart compatibility-check.  Pixel bytes are never inlined
         // into the JSON; the value field is omitted (see CreateInterworkingJson).
         return "image";
+#if FLOW_FFI_HAS_CUDA
+    } else if (flow_type == TypeName_v<flow::CudaDeviceImage>) {
+        // P13 — GPU-resident image ports.  Descriptor metadata only (no pixel
+        // readback); the value field is omitted just like "image".
+        return "cuda_image";
+#endif
     }
 
     // Default to "none" for complex types

@@ -1563,6 +1563,76 @@ class FlowCoreBindings {
   late final _flow_data_is_image =
       _flow_data_is_imagePtr.asFunction<bool Function(FlowNodeDataHandle)>();
 
+  void flow_ffi_set_texture_registrar(
+    ffi.Pointer<ffi.Void> registrar,
+  ) {
+    return _flow_ffi_set_texture_registrar(
+      registrar,
+    );
+  }
+
+  late final _flow_ffi_set_texture_registrarPtr =
+      _lookup<ffi.NativeFunction<ffi.Void Function(ffi.Pointer<ffi.Void>)>>(
+          'flow_ffi_set_texture_registrar');
+  late final _flow_ffi_set_texture_registrar =
+      _flow_ffi_set_texture_registrarPtr
+          .asFunction<void Function(ffi.Pointer<ffi.Void>)>();
+
+  ffi.Pointer<ffi.Void> flow_ffi_get_texture_registrar() {
+    return _flow_ffi_get_texture_registrar();
+  }
+
+  late final _flow_ffi_get_texture_registrarPtr =
+      _lookup<ffi.NativeFunction<ffi.Pointer<ffi.Void> Function()>>(
+          'flow_ffi_get_texture_registrar');
+  late final _flow_ffi_get_texture_registrar =
+      _flow_ffi_get_texture_registrarPtr
+          .asFunction<ffi.Pointer<ffi.Void> Function()>();
+
+  int flow_ffi_is_texture_registrar_bound() {
+    return _flow_ffi_is_texture_registrar_bound();
+  }
+
+  late final _flow_ffi_is_texture_registrar_boundPtr =
+      _lookup<ffi.NativeFunction<ffi.Int Function()>>(
+          'flow_ffi_is_texture_registrar_bound');
+  late final _flow_ffi_is_texture_registrar_bound =
+      _flow_ffi_is_texture_registrar_boundPtr.asFunction<int Function()>();
+
+  void flow_ffi_set_texture_ops(
+    ffi.Pointer<FlowTextureOps> ops,
+  ) {
+    return _flow_ffi_set_texture_ops(
+      ops,
+    );
+  }
+
+  late final _flow_ffi_set_texture_opsPtr = _lookup<
+          ffi.NativeFunction<ffi.Void Function(ffi.Pointer<FlowTextureOps>)>>(
+      'flow_ffi_set_texture_ops');
+  late final _flow_ffi_set_texture_ops = _flow_ffi_set_texture_opsPtr
+      .asFunction<void Function(ffi.Pointer<FlowTextureOps>)>();
+
+  int flow_ffi_is_texture_ops_bound() {
+    return _flow_ffi_is_texture_ops_bound();
+  }
+
+  late final _flow_ffi_is_texture_ops_boundPtr =
+      _lookup<ffi.NativeFunction<ffi.Int Function()>>(
+          'flow_ffi_is_texture_ops_bound');
+  late final _flow_ffi_is_texture_ops_bound =
+      _flow_ffi_is_texture_ops_boundPtr.asFunction<int Function()>();
+
+  FlowTextureOps flow_ffi_get_texture_ops() {
+    return _flow_ffi_get_texture_ops();
+  }
+
+  late final _flow_ffi_get_texture_opsPtr =
+      _lookup<ffi.NativeFunction<FlowTextureOps Function()>>(
+          'flow_ffi_get_texture_ops');
+  late final _flow_ffi_get_texture_ops =
+      _flow_ffi_get_texture_opsPtr.asFunction<FlowTextureOps Function()>();
+
   void flow_free_string(
     ffi.Pointer<ffi.Char> str,
   ) {
@@ -1857,96 +1927,11 @@ class FlowCoreBindings {
       .asFunction<bool Function(FlowEventRegistrationHandle)>();
 }
 
-final class __mbstate_t extends ffi.Union {
-  @ffi.Array.multi([128])
-  external ffi.Array<ffi.Char> __mbstate8;
+final class max_align_t extends ffi.Opaque {}
 
-  @ffi.LongLong()
-  external int _mbstateL;
-}
-
-final class __darwin_pthread_handler_rec extends ffi.Struct {
-  external ffi
-      .Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Pointer<ffi.Void>)>>
-      __routine;
-
-  external ffi.Pointer<ffi.Void> __arg;
-
-  external ffi.Pointer<__darwin_pthread_handler_rec> __next;
-}
-
-final class _opaque_pthread_attr_t extends ffi.Struct {
-  @ffi.Long()
-  external int __sig;
-
-  @ffi.Array.multi([56])
-  external ffi.Array<ffi.Char> __opaque;
-}
-
-final class _opaque_pthread_cond_t extends ffi.Struct {
-  @ffi.Long()
-  external int __sig;
-
-  @ffi.Array.multi([40])
-  external ffi.Array<ffi.Char> __opaque;
-}
-
-final class _opaque_pthread_condattr_t extends ffi.Struct {
-  @ffi.Long()
-  external int __sig;
-
-  @ffi.Array.multi([8])
-  external ffi.Array<ffi.Char> __opaque;
-}
-
-final class _opaque_pthread_mutex_t extends ffi.Struct {
-  @ffi.Long()
-  external int __sig;
-
-  @ffi.Array.multi([56])
-  external ffi.Array<ffi.Char> __opaque;
-}
-
-final class _opaque_pthread_mutexattr_t extends ffi.Struct {
-  @ffi.Long()
-  external int __sig;
-
-  @ffi.Array.multi([8])
-  external ffi.Array<ffi.Char> __opaque;
-}
-
-final class _opaque_pthread_once_t extends ffi.Struct {
-  @ffi.Long()
-  external int __sig;
-
-  @ffi.Array.multi([8])
-  external ffi.Array<ffi.Char> __opaque;
-}
-
-final class _opaque_pthread_rwlock_t extends ffi.Struct {
-  @ffi.Long()
-  external int __sig;
-
-  @ffi.Array.multi([192])
-  external ffi.Array<ffi.Char> __opaque;
-}
-
-final class _opaque_pthread_rwlockattr_t extends ffi.Struct {
-  @ffi.Long()
-  external int __sig;
-
-  @ffi.Array.multi([16])
-  external ffi.Array<ffi.Char> __opaque;
-}
-
-final class _opaque_pthread_t extends ffi.Struct {
-  @ffi.Long()
-  external int __sig;
-
-  external ffi.Pointer<__darwin_pthread_handler_rec> __cleanup_stack;
-
-  @ffi.Array.multi([8176])
-  external ffi.Array<ffi.Char> __opaque;
+final class __fsid_t extends ffi.Struct {
+  @ffi.Array.multi([2])
+  external ffi.Array<ffi.Int> __val;
 }
 
 abstract class FlowError {
@@ -2056,6 +2041,47 @@ final class FlowImageDescriptor extends ffi.Struct {
   external int content_version;
 }
 
+final class FlowTextureOps extends ffi.Struct {
+  external FlowTextureCreateFn create_gl_texture;
+
+  external FlowTextureDestroyFn destroy_gl_texture;
+
+  external FlowTextureMarkFrameFn mark_frame_available;
+}
+
+typedef FlowTextureCreateFn
+    = ffi.Pointer<ffi.NativeFunction<FlowTextureCreateFnFunction>>;
+typedef FlowTextureCreateFnFunction = ffi.Int Function(
+    ffi.Pointer<ffi.Void> registrar,
+    ffi.Int32 width,
+    ffi.Int32 height,
+    ffi.Pointer<ffi.Pointer<ffi.Void>> out_texture_object,
+    ffi.Pointer<ffi.Int64> out_texture_id,
+    ffi.Pointer<ffi.Uint32> out_gl_name);
+typedef DartFlowTextureCreateFnFunction = int Function(
+    ffi.Pointer<ffi.Void> registrar,
+    int width,
+    int height,
+    ffi.Pointer<ffi.Pointer<ffi.Void>> out_texture_object,
+    ffi.Pointer<ffi.Int64> out_texture_id,
+    ffi.Pointer<ffi.Uint32> out_gl_name);
+typedef FlowTextureDestroyFn
+    = ffi.Pointer<ffi.NativeFunction<FlowTextureDestroyFnFunction>>;
+typedef FlowTextureDestroyFnFunction = ffi.Void Function(
+    ffi.Pointer<ffi.Void> registrar,
+    ffi.Pointer<ffi.Void> texture_object,
+    ffi.Int64 texture_id);
+typedef DartFlowTextureDestroyFnFunction = void Function(
+    ffi.Pointer<ffi.Void> registrar,
+    ffi.Pointer<ffi.Void> texture_object,
+    int texture_id);
+typedef FlowTextureMarkFrameFn
+    = ffi.Pointer<ffi.NativeFunction<FlowTextureMarkFrameFnFunction>>;
+typedef FlowTextureMarkFrameFnFunction = ffi.Void Function(
+    ffi.Pointer<ffi.Void> registrar, ffi.Pointer<ffi.Void> texture_object);
+typedef DartFlowTextureMarkFrameFnFunction = void Function(
+    ffi.Pointer<ffi.Void> registrar, ffi.Pointer<ffi.Void> texture_object);
+
 final class FlowEventRegistration extends ffi.Opaque {}
 
 typedef FlowEventRegistrationHandle = ffi.Pointer<FlowEventRegistration>;
@@ -2090,95 +2116,139 @@ typedef DartFlowNodeDataEventCallbackFunction = void Function(
     FlowNodeDataHandle data,
     ffi.Pointer<ffi.Void> user_data);
 
-const int __bool_true_false_are_defined = 1;
-
 const int true1 = 1;
 
 const int false1 = 0;
 
-const int __has_safe_buffers = 1;
-
-const int __DARWIN_ONLY_64_BIT_INO_T = 1;
-
-const int __DARWIN_ONLY_UNIX_CONFORMANCE = 1;
-
-const int __DARWIN_ONLY_VERS_1050 = 1;
-
-const int __DARWIN_UNIX03 = 1;
-
-const int __DARWIN_64_BIT_INO_T = 1;
-
-const int __DARWIN_VERS_1050 = 1;
-
-const int __DARWIN_NON_CANCELABLE = 0;
-
-const String __DARWIN_SUF_EXTSN = '\$DARWIN_EXTSN';
-
-const int __DARWIN_C_ANSI = 4096;
-
-const int __DARWIN_C_FULL = 900000;
-
-const int __DARWIN_C_LEVEL = 900000;
-
-const int __STDC_WANT_LIB_EXT1__ = 1;
-
-const int __DARWIN_NO_LONG_LONG = 0;
-
-const int _DARWIN_FEATURE_64_BIT_INODE = 1;
-
-const int _DARWIN_FEATURE_ONLY_64_BIT_INODE = 1;
-
-const int _DARWIN_FEATURE_ONLY_VERS_1050 = 1;
-
-const int _DARWIN_FEATURE_ONLY_UNIX_CONFORMANCE = 1;
-
-const int _DARWIN_FEATURE_UNIX_CONFORMANCE = 3;
-
-const int __has_ptrcheck = 0;
-
-const int __has_bounds_safety_attributes = 0;
-
-const int __DARWIN_NULL = 0;
-
-const int __PTHREAD_SIZE__ = 8176;
-
-const int __PTHREAD_ATTR_SIZE__ = 56;
-
-const int __PTHREAD_MUTEXATTR_SIZE__ = 8;
-
-const int __PTHREAD_MUTEX_SIZE__ = 56;
-
-const int __PTHREAD_CONDATTR_SIZE__ = 8;
-
-const int __PTHREAD_COND_SIZE__ = 40;
-
-const int __PTHREAD_ONCE_SIZE__ = 8;
-
-const int __PTHREAD_RWLOCK_SIZE__ = 192;
-
-const int __PTHREAD_RWLOCKATTR_SIZE__ = 16;
-
-const int __DARWIN_WCHAR_MAX = 2147483647;
-
-const int __DARWIN_WCHAR_MIN = -2147483648;
-
-const int __DARWIN_WEOF = -1;
-
-const int _FORTIFY_SOURCE = 2;
+const int __bool_true_false_are_defined = 1;
 
 const int NULL = 0;
 
-const int USER_ADDR_NULL = 0;
+const int _STDINT_H = 1;
+
+const int _FEATURES_H = 1;
+
+const int _DEFAULT_SOURCE = 1;
+
+const int __GLIBC_USE_ISOC2X = 1;
+
+const int __USE_ISOC11 = 1;
+
+const int __USE_ISOC99 = 1;
+
+const int __USE_ISOC95 = 1;
+
+const int _POSIX_SOURCE = 1;
+
+const int _POSIX_C_SOURCE = 200809;
+
+const int __USE_POSIX = 1;
+
+const int __USE_POSIX2 = 1;
+
+const int __USE_POSIX199309 = 1;
+
+const int __USE_POSIX199506 = 1;
+
+const int __USE_XOPEN2K = 1;
+
+const int __USE_XOPEN2K8 = 1;
+
+const int _ATFILE_SOURCE = 1;
 
 const int __WORDSIZE = 64;
 
-const int INT8_MAX = 127;
+const int __WORDSIZE_TIME64_COMPAT32 = 1;
 
-const int INT16_MAX = 32767;
+const int __SYSCALL_WORDSIZE = 64;
 
-const int INT32_MAX = 2147483647;
+const int __TIMESIZE = 64;
 
-const int INT64_MAX = 9223372036854775807;
+const int __USE_MISC = 1;
+
+const int __USE_ATFILE = 1;
+
+const int __USE_FORTIFY_LEVEL = 0;
+
+const int __GLIBC_USE_DEPRECATED_GETS = 0;
+
+const int __GLIBC_USE_DEPRECATED_SCANF = 0;
+
+const int __GLIBC_USE_C2X_STRTOL = 1;
+
+const int _STDC_PREDEF_H = 1;
+
+const int __STDC_IEC_559__ = 1;
+
+const int __STDC_IEC_60559_BFP__ = 201404;
+
+const int __STDC_IEC_559_COMPLEX__ = 1;
+
+const int __STDC_IEC_60559_COMPLEX__ = 201404;
+
+const int __STDC_ISO_10646__ = 201706;
+
+const int __GNU_LIBRARY__ = 6;
+
+const int __GLIBC__ = 2;
+
+const int __GLIBC_MINOR__ = 39;
+
+const int _SYS_CDEFS_H = 1;
+
+const int __THROW = 1;
+
+const int __THROWNL = 1;
+
+const int __glibc_c99_flexarr_available = 1;
+
+const int __LDOUBLE_REDIRECTS_TO_FLOAT128_ABI = 0;
+
+const int __HAVE_GENERIC_SELECTION = 0;
+
+const int __GLIBC_USE_LIB_EXT2 = 1;
+
+const int __GLIBC_USE_IEC_60559_BFP_EXT = 1;
+
+const int __GLIBC_USE_IEC_60559_BFP_EXT_C2X = 1;
+
+const int __GLIBC_USE_IEC_60559_EXT = 1;
+
+const int __GLIBC_USE_IEC_60559_FUNCS_EXT = 1;
+
+const int __GLIBC_USE_IEC_60559_FUNCS_EXT_C2X = 1;
+
+const int __GLIBC_USE_IEC_60559_TYPES_EXT = 1;
+
+const int _BITS_TYPES_H = 1;
+
+const int _BITS_TYPESIZES_H = 1;
+
+const int __OFF_T_MATCHES_OFF64_T = 1;
+
+const int __INO_T_MATCHES_INO64_T = 1;
+
+const int __RLIM_T_MATCHES_RLIM64_T = 1;
+
+const int __STATFS_MATCHES_STATFS64 = 1;
+
+const int __KERNEL_OLD_TIMEVAL_MATCHES_TIMEVAL64 = 1;
+
+const int __FD_SETSIZE = 1024;
+
+const int _BITS_TIME64_H = 1;
+
+const int _BITS_WCHAR_H = 1;
+
+const int __WCHAR_MAX = 2147483647;
+
+const int __WCHAR_MIN = -2147483648;
+
+const int _BITS_STDINT_INTN_H = 1;
+
+const int _BITS_STDINT_UINTN_H = 1;
+
+const int _BITS_STDINT_LEAST_H = 1;
 
 const int INT8_MIN = -128;
 
@@ -2187,6 +2257,14 @@ const int INT16_MIN = -32768;
 const int INT32_MIN = -2147483648;
 
 const int INT64_MIN = -9223372036854775808;
+
+const int INT8_MAX = 127;
+
+const int INT16_MAX = 32767;
+
+const int INT32_MAX = 2147483647;
+
+const int INT64_MAX = 9223372036854775807;
 
 const int UINT8_MAX = 255;
 
@@ -2222,56 +2300,54 @@ const int UINT_LEAST64_MAX = -1;
 
 const int INT_FAST8_MIN = -128;
 
-const int INT_FAST16_MIN = -32768;
+const int INT_FAST16_MIN = -9223372036854775808;
 
-const int INT_FAST32_MIN = -2147483648;
+const int INT_FAST32_MIN = -9223372036854775808;
 
 const int INT_FAST64_MIN = -9223372036854775808;
 
 const int INT_FAST8_MAX = 127;
 
-const int INT_FAST16_MAX = 32767;
+const int INT_FAST16_MAX = 9223372036854775807;
 
-const int INT_FAST32_MAX = 2147483647;
+const int INT_FAST32_MAX = 9223372036854775807;
 
 const int INT_FAST64_MAX = 9223372036854775807;
 
 const int UINT_FAST8_MAX = 255;
 
-const int UINT_FAST16_MAX = 65535;
+const int UINT_FAST16_MAX = -1;
 
-const int UINT_FAST32_MAX = 4294967295;
+const int UINT_FAST32_MAX = -1;
 
 const int UINT_FAST64_MAX = -1;
 
-const int INTPTR_MAX = 9223372036854775807;
-
 const int INTPTR_MIN = -9223372036854775808;
 
+const int INTPTR_MAX = 9223372036854775807;
+
 const int UINTPTR_MAX = -1;
+
+const int INTMAX_MIN = -9223372036854775808;
 
 const int INTMAX_MAX = 9223372036854775807;
 
 const int UINTMAX_MAX = -1;
 
-const int INTMAX_MIN = -9223372036854775808;
-
 const int PTRDIFF_MIN = -9223372036854775808;
 
 const int PTRDIFF_MAX = 9223372036854775807;
 
-const int SIZE_MAX = -1;
-
-const int RSIZE_MAX = 9223372036854775807;
-
-const int WCHAR_MAX = 2147483647;
-
-const int WCHAR_MIN = -2147483648;
-
-const int WINT_MIN = -2147483648;
-
-const int WINT_MAX = 2147483647;
-
 const int SIG_ATOMIC_MIN = -2147483648;
 
 const int SIG_ATOMIC_MAX = 2147483647;
+
+const int SIZE_MAX = -1;
+
+const int WCHAR_MIN = -2147483648;
+
+const int WCHAR_MAX = 2147483647;
+
+const int WINT_MIN = 0;
+
+const int WINT_MAX = 4294967295;

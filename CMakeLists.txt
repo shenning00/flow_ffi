@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.16)
+cmake_minimum_required(VERSION 3.18)
 project(flow_ffi VERSION 1.0.0 LANGUAGES CXX)
 
 # Set C++ standard
@@ -23,6 +23,15 @@ find_package(flow-core REQUIRED CONFIG)
 
 message(STATUS "Found flow-core package")
 
+option(FLOW_FFI_ENABLE_CUDA "Build CUDA image-path support" OFF)
+
+# Propagate the gate down to flow_wire *before* the existing add_subdirectory
+# call.  flow_wire reads its own option() after this CACHE BOOL … FORCE entry
+# has been written, so it sees the value set here rather than its own default.
+# Mirrors the FLOW_INTERWORK_WITH_OPENCV pattern in flow_wire/CMakeLists.txt.
+set(FLOW_WIRE_WITH_CUDA ${FLOW_FFI_ENABLE_CUDA} CACHE BOOL
+    "flow_wire: build CUDA-aware wire types and adapter nodes" FORCE)
+
 # flow_wire: interwork layer that owns the canonical flow::Image wire type
 # and the generic source/sink nodes that produce/consume it (ImageOpenNode,
 # PreviewNode), plus optionally compiled cv::Mat adapter nodes.  Lives as a
@@ -46,6 +55,13 @@ add_library(flow_ffi SHARED
     src/event_bridge.cpp
     # P10: Image primitives & built-in PreviewNode
     src/image_bridge.cpp
+    # Phase D prep: texture registrar slot for CUDA/GPU plugin handoff
+    src/texture_registrar_slot.cpp
+    # Phase D: texture ops callbacks (plugin-extension pattern)
+    src/texture_ops_slot.cpp
+    # P12: non-CUDA GPU texture ops slot + host→texture bridge (always built)
+    src/gpu_texture_ops_slot.cpp
+    src/image_bridge_gpu.cpp
 )
 
 # Include directories
@@ -65,6 +81,36 @@ target_link_libraries(flow_ffi
         flow-core::flow-core
         flow_wire
 )
+
+if (FLOW_FFI_ENABLE_CUDA)
+    enable_language(CUDA)
+    find_package(CUDAToolkit REQUIRED)
+    target_compile_definitions(flow_ffi PUBLIC FLOW_FFI_HAS_CUDA=1)
+    target_sources(flow_ffi PRIVATE src/image_bridge_cuda.cpp)
+    target_link_libraries(flow_ffi PRIVATE CUDA::cudart CUDA::cuda_driver)
+
+    # GL/EGL: required for cudaGraphicsGLRegisterImage.
+    # We use libepoxy for function-pointer dispatch (same as Flutter/GTK on Linux)
+    # and link the system OpenGL/EGL loader libs for cudaGL interop.
+    find_package(OpenGL REQUIRED COMPONENTS OpenGL)
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(EPOXY REQUIRED epoxy)
+    target_link_libraries(flow_ffi PRIVATE OpenGL::GL ${EPOXY_LIBRARIES})
+    target_include_directories(flow_ffi PRIVATE ${EPOXY_INCLUDE_DIRS})
+
+    # CUDA GL interop header (cuda_gl_interop.h) lives under CUDAToolkit.
+    # CUDAToolkit_INCLUDE_DIRS is set by find_package(CUDAToolkit).
+    target_include_directories(flow_ffi PRIVATE ${CUDAToolkit_INCLUDE_DIRS})
+else()
+    target_compile_definitions(flow_ffi PUBLIC FLOW_FFI_HAS_CUDA=0)
+    # Always provide the 4 texture FFI symbols even in the no-CUDA build so
+    # that the test binary and any Dart FFI loader can resolve them (they
+    # return FLOW_ERROR_NOT_IMPLEMENTED / no-op).
+    target_sources(flow_ffi PRIVATE src/image_bridge_cuda_stub.cpp)
+endif()
+
+# Capability TU is compiled in BOTH modes; its body switches on FLOW_FFI_HAS_CUDA.
+target_sources(flow_ffi PRIVATE src/cuda_capability.cpp)
 
 # Platform-specific link options
 if(APPLE)

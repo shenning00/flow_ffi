@@ -122,6 +122,73 @@ FLOW_FFI_EXPORT FlowError flow_data_get_int(FlowNodeDataHandle data, int32_t* va
     });
 }
 
+// 64-bit integer access — accepts NodeData<int64_t>, NodeData<long>,
+// NodeData<long long>.  Separate symbol from flow_data_get_int because the
+// Dart-side int is 64-bit, and ports like FlowFlutterCudaPreview's "texture_id"
+// emit values that don't fit in int32_t.
+FLOW_FFI_EXPORT FlowError flow_data_get_int64(FlowNodeDataHandle data, int64_t* value) {
+    FLOW_API_CALL({
+        if (!flow_ffi::validate_handle(data, "data")) {
+            return FLOW_ERROR_INVALID_HANDLE;
+        }
+        if (!flow_ffi::validate_pointer(value, "value")) {
+            return FLOW_ERROR_INVALID_ARGUMENT;
+        }
+
+        auto* data_wrapper = flow_ffi::get_handle<NodeDataWrapper>(data);
+        if (!data_wrapper) {
+            flow_ffi::ErrorManager::instance().set_error(FLOW_ERROR_INVALID_HANDLE,
+                                                         "Invalid data handle");
+            return FLOW_ERROR_INVALID_HANDLE;
+        }
+
+        if (!data_wrapper->data) {
+            flow_ffi::ErrorManager::instance().set_error(FLOW_ERROR_INVALID_ARGUMENT,
+                                                         "Data is null");
+            return FLOW_ERROR_INVALID_ARGUMENT;
+        }
+
+        // Accept any of the 64-bit integer flavours flow-core might store.
+        // TypeName_v<int64_t> resolves to "long" on gcc/clang Linux x86_64;
+        // we list the synonyms explicitly so the check is exhaustive.
+        const std::string_view t = data_wrapper->data->Type();
+        if (t == TypeName_v<int64_t> ||
+            t == TypeName_v<long> ||
+            t == TypeName_v<long long> ||
+            t == TypeName_v<uint64_t> ||
+            t == TypeName_v<unsigned long> ||
+            t == TypeName_v<unsigned long long>) {
+
+            try {
+                if (t == TypeName_v<int64_t>) {
+                    *value = static_cast<detail::NodeData<int64_t>*>(data_wrapper->data.get())->Get();
+                } else if (t == TypeName_v<long>) {
+                    *value = static_cast<int64_t>(static_cast<detail::NodeData<long>*>(data_wrapper->data.get())->Get());
+                } else if (t == TypeName_v<long long>) {
+                    *value = static_cast<int64_t>(static_cast<detail::NodeData<long long>*>(data_wrapper->data.get())->Get());
+                } else if (t == TypeName_v<uint64_t>) {
+                    *value = static_cast<int64_t>(static_cast<detail::NodeData<uint64_t>*>(data_wrapper->data.get())->Get());
+                } else if (t == TypeName_v<unsigned long>) {
+                    *value = static_cast<int64_t>(static_cast<detail::NodeData<unsigned long>*>(data_wrapper->data.get())->Get());
+                } else {
+                    *value = static_cast<int64_t>(static_cast<detail::NodeData<unsigned long long>*>(data_wrapper->data.get())->Get());
+                }
+                return FLOW_SUCCESS;
+            } catch (const std::exception& e) {
+                flow_ffi::ErrorManager::instance().set_error(
+                    FLOW_ERROR_UNKNOWN,
+                    std::string("Failed to get int64 value: ") + e.what());
+                return FLOW_ERROR_UNKNOWN;
+            }
+        }
+
+        flow_ffi::ErrorManager::instance().set_error(
+            FLOW_ERROR_TYPE_MISMATCH,
+            std::string("Expected 64-bit integer, got ") + std::string(t));
+        return FLOW_ERROR_TYPE_MISMATCH;
+    });
+}
+
 FLOW_FFI_EXPORT FlowError flow_data_get_double(FlowNodeDataHandle data, double* value) {
     FLOW_API_CALL({
         if (!flow_ffi::validate_handle(data, "data")) {

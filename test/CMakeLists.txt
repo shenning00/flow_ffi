@@ -49,6 +49,10 @@ add_executable(flow_ffi_tests
     test_env_add_task_set_input_data.cpp
     test_p10_image_primitives.cpp
     test_image_open_node.cpp
+    # Phase D: CUDA/Flutter texture interop API surface tests
+    test_cuda_texture_interop.cpp
+    # P12: non-CUDA GPU texture path (always built, no CUDA gate)
+    test_flutter_texture_sink.cpp
 )
 
 # Link libraries
@@ -63,6 +67,20 @@ target_link_libraries(flow_ffi_tests
         gtest
 )
 
+# Phase D: CUDA + GL/EGL test dependencies.
+# The interop test (test_cuda_texture_interop.cpp) uses EGL for headless GL
+# context creation and cudaGraphicsGLRegisterImage directly in the GPU test.
+if(FLOW_FFI_ENABLE_CUDA)
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(EPOXY REQUIRED epoxy)
+    target_link_libraries(flow_ffi_tests
+        PRIVATE
+            CUDA::cudart
+            ${EPOXY_LIBRARIES}
+    )
+    target_include_directories(flow_ffi_tests PRIVATE ${EPOXY_INCLUDE_DIRS})
+endif()
+
 # Include directories
 target_include_directories(flow_ffi_tests
     PRIVATE
@@ -73,3 +91,84 @@ target_include_directories(flow_ffi_tests
 # Add tests to CTest
 include(GoogleTest)
 gtest_discover_tests(flow_ffi_tests)
+
+# --------------------------------------------------------------------------
+# P13 capability probe — compiled in both CUDA and no-CUDA configurations.
+# When CUDA is absent the probe should report available=0 count=0.
+# When CUDA is present it should report available=1 count>=1 with a device name.
+# --------------------------------------------------------------------------
+add_executable(flow_ffi_cuda_probe test_cuda_capability_probe.cpp)
+target_link_libraries(flow_ffi_cuda_probe
+    PRIVATE
+        flow_ffi
+        flow-core::flow-core
+)
+target_include_directories(flow_ffi_cuda_probe
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/../include
+)
+
+# The probe exits 0 when the symbol is callable (regardless of whether CUDA
+# hardware is present). A non-zero exit signals a missing symbol or crash.
+add_test(NAME cuda_capability_probe COMMAND flow_ffi_cuda_probe)
+set_tests_properties(cuda_capability_probe PROPERTIES
+    PASS_REGULAR_EXPRESSION "available="
+)
+
+# --------------------------------------------------------------------------
+# Phase G: CudaToImage adapter node bridge test — CUDA builds only.
+# Allocates a 16x16 RGBA8 device buffer, fills it with 0xAB via cudaMemset,
+# constructs a CudaToImage node, drives Compute, and verifies all output bytes
+# equal 0xAB (i.e. cudaMemcpy2D worked correctly).
+# --------------------------------------------------------------------------
+if(FLOW_FFI_ENABLE_CUDA)
+    add_executable(flow_ffi_cuda_to_image_bridge
+        test_cuda_to_image_bridge.cpp
+    )
+    target_link_libraries(flow_ffi_cuda_to_image_bridge
+        PRIVATE
+            flow_ffi
+            flow_wire
+            flow-core::flow-core
+            CUDA::cudart
+    )
+    target_include_directories(flow_ffi_cuda_to_image_bridge
+        PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/../include
+    )
+    add_test(NAME cuda_to_image_bridge COMMAND flow_ffi_cuda_to_image_bridge)
+    set_tests_properties(cuda_to_image_bridge PROPERTIES
+        PASS_REGULAR_EXPRESSION "PASS:"
+    )
+
+    # --------------------------------------------------------------------------
+    # Phase E: FlowFlutterCudaPreview sink node tests
+    #
+    # Covers: class registration, construction+port layout, compute-with-no-input
+    # no-op, and compute-with-mock-ops lifecycle (create/write/signal/destroy).
+    # The mock-ops compute test follows the same A13 pattern as Phase D's
+    # cuda_texture_interop suite: accepts both FLOW_ERROR_UNKNOWN (headless, no
+    # GL context) and FLOW_SUCCESS (GL available) since the full register path
+    # invokes cudaGraphicsGLRegisterImage with a fake GL texture name.
+    # --------------------------------------------------------------------------
+    add_executable(flow_ffi_flutter_cuda_preview
+        test_flow_flutter_cuda_preview.cpp
+    )
+    target_link_libraries(flow_ffi_flutter_cuda_preview
+        PRIVATE
+            flow_ffi
+            flow_wire
+            flow-core::flow-core
+            CUDA::cudart
+            gtest_main
+            gtest
+    )
+    target_include_directories(flow_ffi_flutter_cuda_preview
+        PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/../include
+    )
+    include(GoogleTest)
+    gtest_discover_tests(flow_ffi_flutter_cuda_preview
+        TEST_PREFIX "FlowFlutterCudaPreview."
+    )
+endif()

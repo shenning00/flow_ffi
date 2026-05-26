@@ -1,6 +1,8 @@
 import 'dart:ffi';
 import 'dart:io';
 
+import 'package:ffi/ffi.dart';
+
 import 'bindings_generated.dart' as bindings;
 
 /// The dynamic library in which the symbols for [FlowCoreBindings] can be found.
@@ -309,6 +311,20 @@ class FlowCoreBindings {
           Pointer<bindings.FlowNodeData> data, Pointer<Int32> value) =>
       _flowCore.flow_data_get_int(data, value);
 
+  /// Read a 64-bit integer port value.  Hand-written (not in
+  /// bindings_generated.dart) because the generated file would need a full
+  /// ffigen regeneration to pick up the new symbol — the same convention used
+  /// for the CUDA capability bindings below.
+  int flow_data_get_int64(
+      Pointer<bindings.FlowNodeData> data, Pointer<Int64> value) {
+    final fn = _dylib.lookupFunction<
+        Int32 Function(Pointer<bindings.FlowNodeData>, Pointer<Int64>),
+        int Function(Pointer<bindings.FlowNodeData>, Pointer<Int64>)>(
+      'flow_data_get_int64',
+    );
+    return fn(data, value);
+  }
+
   int flow_data_get_double(
           Pointer<bindings.FlowNodeData> data, Pointer<Double> value) =>
       _flowCore.flow_data_get_double(data, value);
@@ -436,6 +452,61 @@ class FlowCoreBindings {
   bool flow_event_is_valid(
           Pointer<bindings.FlowEventRegistration> registration) =>
       _flowCore.flow_event_is_valid(registration);
+
+  // ---------------------------------------------------------------------------
+  // P13 CUDA capability discovery — always safe to call; symbols are present
+  // in both CUDA and non-CUDA builds of libflow_ffi.so (stub stubs return
+  // false/0/"" when compiled without CUDA).
+  // ---------------------------------------------------------------------------
+
+  /// Returns true when the native library was compiled with CUDA support AND
+  /// at least one CUDA device is present on this host.
+  bool flow_ffi_cuda_available() {
+    final fn = _dylib.lookupFunction<Int32 Function(), int Function()>(
+      'flow_ffi_cuda_available',
+    );
+    return fn() != 0;
+  }
+
+  /// Returns the number of CUDA devices detected on this host (0 when CUDA is
+  /// unavailable).
+  int flow_ffi_cuda_device_count() {
+    final fn = _dylib.lookupFunction<Int32 Function(), int Function()>(
+      'flow_ffi_cuda_device_count',
+    );
+    return fn();
+  }
+
+  /// Returns the name of CUDA device at [index] (e.g. "NVIDIA GeForce RTX 4080").
+  /// Returns an empty string when [index] is out of range or CUDA is absent.
+  /// The returned string is borrowed from a process-lifetime static buffer —
+  /// no need to free it.
+  String flow_ffi_cuda_device_name(int index) {
+    final fn = _dylib.lookupFunction<
+        Pointer<Utf8> Function(Int32),
+        Pointer<Utf8> Function(int)>(
+      'flow_ffi_cuda_device_name',
+    );
+    final ptr = fn(index);
+    if (ptr == nullptr) return '';
+    return ptr.toDartString();
+  }
+
+  // ---------------------------------------------------------------------------
+  // P12 GPU texture sink capability — always safe to call; symbol is always
+  // present in libflow_ffi.so.  Returns true only when the Flutter plugin has
+  // registered the FlowGpuTextureOps vtable (i.e. on Linux where
+  // texture_sink_bridge.cc is compiled in).
+  // ---------------------------------------------------------------------------
+
+  /// Returns true when the GPU texture ops vtable has been injected by the
+  /// Flutter plugin.  Safe to call before FlowBridge.initialize().
+  bool flow_ffi_gpu_texture_sink_available() {
+    final fn = _dylib.lookupFunction<Int32 Function(), int Function()>(
+      'flow_ffi_gpu_texture_sink_available',
+    );
+    return fn() != 0;
+  }
 }
 
 /// Global reference for easy access to FlowCore bindings

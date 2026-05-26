@@ -24,6 +24,9 @@ export 'src/utils/event_manager.dart';
 // implementation detail; only the named exports listed here are stable.
 export 'src/ffi/handles.dart' show NodeDataHandle, HandleWrapper;
 export 'src/ffi/bindings.dart' show FlowCoreBindings, flowCore;
+
+// P13 — CUDA capability probe.
+export 'src/capabilities.dart' show FlowFfiCapabilities;
 export 'src/ffi/bindings_generated.dart'
     show
         FlowImageDescriptor,
