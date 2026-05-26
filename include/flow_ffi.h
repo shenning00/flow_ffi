@@ -365,6 +365,11 @@ FLOW_FFI_EXPORT FlowNodeDataHandle flow_data_create_string(const char* value);
 
 // Get typed data
 FLOW_FFI_EXPORT FlowError flow_data_get_int(FlowNodeDataHandle data, int32_t* value);
+// flow_data_get_int64 — for ports declared as int64_t / long / long long
+// (e.g. FlowFlutterCudaPreview's "texture_id" output).  Distinct symbol from
+// flow_data_get_int because int32_t* cannot hold IDs > 2^31 and we don't want
+// silent truncation.
+FLOW_FFI_EXPORT FlowError flow_data_get_int64(FlowNodeDataHandle data, int64_t* value);
 FLOW_FFI_EXPORT FlowError flow_data_get_double(FlowNodeDataHandle data, double* value);
 FLOW_FFI_EXPORT FlowError flow_data_get_bool(FlowNodeDataHandle data, bool* value);
 FLOW_FFI_EXPORT FlowError flow_data_get_string(FlowNodeDataHandle data, char** value);
@@ -434,6 +439,214 @@ FLOW_FFI_EXPORT FlowError flow_data_image_borrow(
 // Cheap predicate — does this NodeData carry a flow::Image?  Safe to call
 // on any handle; returns false for null/invalid handles.
 FLOW_FFI_EXPORT bool flow_data_is_image(FlowNodeDataHandle data);
+
+// ============================================================================
+// Texture Registrar Slot (Phase D / P12 CUDA prep)
+// ============================================================================
+
+// Store a platform texture registrar pointer inside libflow_ffi.so so that
+// future CUDA/GPU nodes (Phase D) can call fl_texture_registrar_register_texture
+// without a dependency on flutter_linux headers.  The pointer is treated as
+// opaque void* here; the Flutter plugin calls this setter at registration time.
+// Thread-safe: stored with atomic store (seq_cst).
+FLOW_FFI_EXPORT void flow_ffi_set_texture_registrar(void* registrar);
+
+// Returns the most recently set registrar pointer, or NULL if never set.
+// For internal use by CUDA/GPU nodes.
+FLOW_FFI_EXPORT void* flow_ffi_get_texture_registrar(void);
+
+// Returns non-zero if a registrar has been successfully set.
+// Intended for Dart integration tests / diagnostics.
+FLOW_FFI_EXPORT int flow_ffi_is_texture_registrar_bound(void);
+
+// ============================================================================
+// Texture Ops Callbacks (Phase D — CUDA/GL interop plugin-extension pattern)
+// ============================================================================
+//
+// libflow_ffi.so cannot include flutter_linux headers directly (they are only
+// available inside a `flutter build linux` context).  Instead, the Linux plugin
+// (packages/flow_ffi_flutter/linux/) implements the FlTextureGL GObject subclass
+// and exposes the three operations below as C function-pointer callbacks that it
+// injects at plugin registration time via flow_ffi_set_texture_ops().
+//
+// All callbacks receive a `registrar` pointer (the same void* previously stored
+// by flow_ffi_set_texture_registrar).  All are called on the platform/UI thread
+// unless noted otherwise.
+//
+// create_gl_texture(registrar, width, height,
+//                  out_texture_object, out_texture_id, out_gl_name)
+//   Allocate a FlTextureGL subclass wrapping a pre-created GL texture of the
+//   given dimensions, register it with FlTextureRegistrar, and write:
+//     *out_texture_object — opaque GObject* (caller must g_object_ref if it
+//                           keeps a long-lived reference)
+//     *out_texture_id     — int64_t Flutter texture ID
+//     *out_gl_name        — uint32_t OpenGL texture name (for CUDA interop)
+//   Returns 0 on success, -1 on failure.
+//
+// destroy_gl_texture(registrar, texture_object, texture_id)
+//   Unregister from FlTextureRegistrar, g_object_unref the texture object.
+//
+// mark_frame_available(registrar, texture_object)
+//   Call fl_texture_registrar_mark_texture_frame_available.
+
+typedef int  (*FlowTextureCreateFn)(void* registrar,
+                                    int32_t width, int32_t height,
+                                    void** out_texture_object,
+                                    int64_t* out_texture_id,
+                                    uint32_t* out_gl_name);
+
+typedef void (*FlowTextureDestroyFn)(void* registrar,
+                                     void* texture_object,
+                                     int64_t texture_id);
+
+typedef void (*FlowTextureMarkFrameFn)(void* registrar,
+                                       void* texture_object);
+
+// wait_initialized(texture_object, out_cuda_resource)
+//   Block (up to ~1 second) until the raster thread has completed the deferred
+//   GL initialisation in FlTextureGL::populate().  On success writes the
+//   cudaGraphicsResource_t handle to *out_cuda_resource and returns 0.
+//   Returns non-zero if initialization failed or timed out; caller must drop
+//   the frame in that case.  thread-safe; may be called from any thread.
+typedef int  (*FlowTextureWaitInitFn)(void* texture_object,
+                                      void** out_cuda_resource);
+
+// submit_frame(texture_object, src_device_ptr, src_pitch_bytes,
+//              width, height, ready_event)
+//   Copy pixels from a CUDA device buffer into the texture's staging buffer
+//   (pure D→D, no GL context required).  The actual GL-coupled Map/Memcpy/
+//   Unmap happens later in populate() on the raster thread.
+//   ready_event: optional cudaEvent_t* (cast to void*); if non-null the
+//     copy is gated on the producer event before starting.
+//   Returns 0 on success, non-zero if the frame was dropped (e.g. staging
+//   buffer not yet allocated, dim mismatch, or CUDA error).
+//   Thread-safe; called from the cascade worker thread.
+typedef int  (*FlowTextureSubmitFrameFn)(void*       texture_object,
+                                         const void* src_device_ptr,
+                                         int32_t     src_pitch_bytes,
+                                         int32_t     width,
+                                         int32_t     height,
+                                         void*       ready_event);
+
+typedef struct FlowTextureOps {
+    FlowTextureCreateFn      create_gl_texture;
+    FlowTextureDestroyFn     destroy_gl_texture;
+    FlowTextureMarkFrameFn   mark_frame_available;
+    FlowTextureWaitInitFn    wait_initialized;    // added Phase D threading fix
+    FlowTextureSubmitFrameFn submit_frame;        // added Phase D data-plane fix
+} FlowTextureOps;
+
+// Called by the Linux plugin during registration to inject the callbacks.
+// All five pointers must be non-null; passing NULL for ops clears the slot.
+FLOW_FFI_EXPORT void  flow_ffi_set_texture_ops(const FlowTextureOps* ops);
+
+// Returns non-zero if all five callbacks are installed.
+// Used by image_bridge_cuda.cpp to gate texture operations.
+FLOW_FFI_EXPORT int   flow_ffi_is_texture_ops_bound(void);
+
+// Internal accessor — returns a copy of the stored FlowTextureOps.
+// Returns all-NULL ops if not yet bound.
+FLOW_FFI_EXPORT FlowTextureOps flow_ffi_get_texture_ops(void);
+
+// ============================================================================
+// GPU Texture Ops Callbacks (P12 — CPU-side host→Flutter texture path)
+// ============================================================================
+//
+// Non-CUDA parallel to the FlowTextureOps / FlowTextureWaitInitFn block above.
+// This vtable is injected by texture_sink_bridge.cc in the Linux Flutter plugin
+// at registration time; libflow_ffi.so calls through it to register, destroy,
+// wait, and upload textures without touching cudart at all.
+//
+// The submit_frame callback differs from the CUDA variant: src_bytes points to
+// host (CPU) memory; row_stride_bytes is the stride of the source image (may
+// be > width*4 for padded images).  The implementation must memcpy the pixel
+// rows and tolerate stride padding.
+//
+// All operations are synchronous — no events, no streams, no async.
+
+typedef void* FlowGpuTextureHandle;
+
+// create_gpu_texture(registrar, width, height,
+//                   out_texture_object, out_texture_id)
+//   Allocate a FlTextureGL subclass, register with FlTextureRegistrar, arm the
+//   bootstrap re-mark loop, and write:
+//     *out_texture_object — opaque GObject* (caller holds ref)
+//     *out_texture_id     — int64_t Flutter texture ID
+//   Returns 0 on success, -1 on failure.
+typedef int  (*FlowGpuTextureCreateFn)(void*    registrar,
+                                       int32_t  width,
+                                       int32_t  height,
+                                       void**   out_texture_object,
+                                       int64_t* out_texture_id);
+
+// destroy_gpu_texture(registrar, texture_object, texture_id)
+//   Unregister from FlTextureRegistrar and g_object_unref the texture object.
+typedef void (*FlowGpuTextureDestroyFn)(void*   registrar,
+                                        void*   texture_object,
+                                        int64_t texture_id);
+
+// mark_gpu_frame_available(registrar, texture_object)
+//   Call fl_texture_registrar_mark_texture_frame_available.
+typedef void (*FlowGpuTextureMarkFrameFn)(void* registrar,
+                                          void* texture_object);
+
+// wait_gpu_initialized(texture_object)
+//   Block (up to ~1 s) until populate() has completed deferred GL init.
+//   Returns 0 on success, non-zero on failure / timeout.
+typedef int  (*FlowGpuTextureWaitInitFn)(void* texture_object);
+
+// submit_gpu_frame(texture_object, src_bytes, row_stride_bytes, width, height)
+//   Copy host pixels into the texture's staging buffer (pure memcpy — no GL
+//   context required).  Returns 0 on success, non-zero on drop.
+typedef int  (*FlowGpuTextureSubmitFrameFn)(void*       texture_object,
+                                            const void* src_bytes,
+                                            int32_t     row_stride_bytes,
+                                            int32_t     width,
+                                            int32_t     height);
+
+typedef struct FlowGpuTextureOps {
+    FlowGpuTextureCreateFn      create_texture;
+    FlowGpuTextureDestroyFn     destroy_texture;
+    FlowGpuTextureMarkFrameFn   mark_frame_available;
+    FlowGpuTextureWaitInitFn    wait_initialized;
+    FlowGpuTextureSubmitFrameFn submit_frame;
+} FlowGpuTextureOps;
+
+// Called by texture_sink_bridge.cc during plugin registration.
+// All five pointers must be non-null; passing NULL clears the slot.
+FLOW_FFI_EXPORT void flow_ffi_set_gpu_texture_ops(const FlowGpuTextureOps* ops);
+
+// Returns non-zero if all five callbacks are installed.
+FLOW_FFI_EXPORT int  flow_ffi_is_gpu_texture_ops_bound(void);
+
+// Returns a copy of the stored FlowGpuTextureOps (all-NULL when not bound).
+FLOW_FFI_EXPORT FlowGpuTextureOps flow_ffi_get_gpu_texture_ops(void);
+
+// True when the GPU texture ops vtable is bound.  Always-present symbol
+// (returns false on non-Linux or before the plugin registers).
+FLOW_FFI_EXPORT bool flow_ffi_gpu_texture_sink_available(void);
+
+// Register a Flutter texture of the given dimensions via the GPU texture ops.
+// On success, *out and *out_texture_id are populated.
+FLOW_FFI_EXPORT FlowError flow_ffi_register_flutter_texture(
+    int32_t              w,
+    int32_t              h,
+    FlowGpuTextureHandle* out,
+    int64_t*             out_texture_id);
+
+// Unregister a previously registered Flutter texture.
+FLOW_FFI_EXPORT FlowError flow_ffi_unregister_flutter_texture(
+    FlowGpuTextureHandle handle);
+
+// Synchronously copy host bytes into the texture's staging buffer, then kick
+// mark_frame_available.  row_stride_bytes is the stride of the source buffer;
+// may be > width*4 for padded images.
+FLOW_FFI_EXPORT FlowError flow_ffi_upload_to_texture(
+    FlowGpuTextureHandle handle,
+    const void*          host_bytes,
+    int32_t              row_stride_bytes,
+    int32_t              width,
+    int32_t              height);
 
 // ============================================================================
 // Memory Management Helpers

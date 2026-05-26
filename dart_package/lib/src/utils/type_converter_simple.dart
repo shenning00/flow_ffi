@@ -61,6 +61,7 @@ class TypeConverter {
     }
 
     if (T == int) {
+      // Try 32-bit path first (matches ports declared as plain `int`).
       final valuePtr = calloc<Int32>();
       try {
         final result = flowCore.flow_data_get_int(dataHandle.handle, valuePtr);
@@ -70,6 +71,20 @@ class TypeConverter {
         }
       } finally {
         calloc.free(valuePtr);
+      }
+      // Fall back to 64-bit path for ports declared as int64_t / long /
+      // long long (e.g. FlowFlutterCudaPreview's "texture_id" output, whose
+      // values commonly exceed 2^31).  Dart's `int` is 64-bit on 64-bit
+      // platforms, so the wider value still fits.
+      final value64Ptr = calloc<Int64>();
+      try {
+        final result =
+            flowCore.flow_data_get_int64(dataHandle.handle, value64Ptr);
+        if (result == 0) {
+          return value64Ptr.value as T;
+        }
+      } finally {
+        calloc.free(value64Ptr);
       }
     } else if (T == double) {
       final valuePtr = calloc<Double>();
