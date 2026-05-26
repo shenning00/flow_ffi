@@ -25,18 +25,26 @@ message(STATUS "Found flow-core package")
 
 option(FLOW_FFI_ENABLE_CUDA "Build CUDA image-path support" OFF)
 
-# Propagate the gate down to flow_wire *before* the existing add_subdirectory
-# call.  flow_wire reads its own option() after this CACHE BOOL … FORCE entry
-# has been written, so it sees the value set here rather than its own default.
-# Mirrors the FLOW_INTERWORK_WITH_OPENCV pattern in flow_wire/CMakeLists.txt.
+# Propagate the gate down to flow_wire *before* add_subdirectory.  flow_wire
+# reads its own option() after this CACHE BOOL … FORCE entry has been written,
+# so it sees the value set here rather than its own default.  Mirrors the
+# FLOW_INTERWORK_WITH_OPENCV pattern in flow_wire/CMakeLists.txt.
 set(FLOW_WIRE_WITH_CUDA ${FLOW_FFI_ENABLE_CUDA} CACHE BOOL
     "flow_wire: build CUDA-aware wire types and adapter nodes" FORCE)
 
+# Point flow_wire's CUDA branch at our include directory.  flow_wire is
+# location-agnostic — works as a git submodule under flow_ffi/flow_wire/, as
+# a sibling at ../flow_wire/, or any other layout — by reading this variable
+# rather than hard-coding ../flow_ffi/include.
+set(FLOW_FFI_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/include CACHE PATH
+    "Where flow_wire (and any other downstream) finds flow_ffi/include" FORCE)
+
 # flow_wire: interwork layer that owns the canonical flow::Image wire type
 # and the generic source/sink nodes that produce/consume it (ImageOpenNode,
-# PreviewNode), plus optionally compiled cv::Mat adapter nodes.  Lives as a
-# sibling directory; built as a static library and absorbed into flow_ffi.so.
-add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../flow_wire ${CMAKE_CURRENT_BINARY_DIR}/flow_wire)
+# PreviewNode), plus optionally compiled cv::Mat adapter nodes and CUDA-aware
+# nodes.  Embedded as a git submodule at flow_wire/.  Built as a static
+# library and absorbed into flow_ffi.so.
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/flow_wire ${CMAKE_CURRENT_BINARY_DIR}/flow_wire)
 
 # Create shared library
 add_library(flow_ffi SHARED
