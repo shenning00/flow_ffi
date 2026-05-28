@@ -56,44 +56,91 @@ class Graph {
   /// Creates a node of the specified [classId] with the given [name] and
   /// adds it to the graph. Returns the created node instance.
   ///
-  /// Throws [FlowException] if the node creation fails.
-  Node addNode(String classId, [String? name]) {
-    final nodeHandle = flowCore.native.flow_graph_add_node(
-      handle,
-      classId.toNativeUtf8().cast<Char>(),
-      (name ?? 'Node').toNativeUtf8().cast<Char>(),
-    );
-    ErrorHandler.checkError();
-    if (nodeHandle == nullptr) {
-      throw UnknownFlowException('Failed to add node of class: $classId');
+  /// If [uuid] is non-null, the new node is constructed with exactly that
+  /// UUID (must be a well-formed UUID string — see flow-core's `UUID(string)`
+  /// constructor). When [uuid] is null, the engine generates a fresh v4 UUID.
+  /// To preserve back-compat with existing positional callers (which use
+  /// `addNode(classId, name)`) [uuid] is appended as a second optional
+  /// positional parameter — Dart does not allow mixing optional positional
+  /// and named parameters in a single declaration, so the
+  /// `mixed positional+named` shape suggested in the design doc is not
+  /// syntactically expressible. The "name-only" callers
+  /// (`example/simple_workflow.dart:51`, `services/flow_service.dart:126`,
+  /// `services/graph_builder.dart:48`, `flow_bridge.dart:607`) continue to
+  /// compile and behave identically; new callers wanting an explicit UUID
+  /// pass it as the third positional argument.
+  ///
+  /// A null [name] falls back to the literal string `'Node'` — same default
+  /// as before this method gained the [uuid] parameter, so existing positional
+  /// callers are unaffected. To pass [uuid] while letting [name] take the
+  /// default, call `graph.addNode("MyClass", null, "<uuid>")`.
+  ///
+  /// Always routes through the underlying `flow_graph_add_node_with_uuid`
+  /// FFI symbol (the old `flow_graph_add_node` is now a thin wrapper that
+  /// calls into the same implementation with `uuid=nullptr`), so the bug
+  /// fixes baked into the new symbol (post-add `verifyNode` return,
+  /// `Graph::AddNode` exception guard) reach old positional callers too.
+  ///
+  /// Throws [FlowException] if the node creation fails. A malformed [uuid]
+  /// surfaces an [InvalidArgumentException] propagated from
+  /// `FLOW_ERROR_INVALID_ARGUMENT`.
+  Node addNode(String classId, [String? name, String? uuid]) {
+    final cClassId = classId.toNativeUtf8();
+    final cUuid = uuid?.toNativeUtf8();
+    final cName = (name ?? 'Node').toNativeUtf8();
+    try {
+      final nodeHandle = flowCore.native.flow_graph_add_node_with_uuid(
+        handle,
+        cClassId.cast<Char>(),
+        cUuid?.cast<Char>() ?? nullptr,
+        cName.cast<Char>(),
+      );
+      ErrorHandler.checkError();
+      if (nodeHandle == nullptr) {
+        throw UnknownFlowException('Failed to add node of class: $classId');
+      }
+      return Node.fromHandle(NodeHandle(nodeHandle.cast()));
+    } finally {
+      calloc.free(cClassId);
+      if (cUuid != null) calloc.free(cUuid);
+      calloc.free(cName);
     }
-    return Node.fromHandle(NodeHandle(nodeHandle.cast()));
   }
 
   /// Removes a node from the graph by its ID.
   ///
   /// Throws [FlowException] if the node removal fails.
   void removeNode(String nodeId) {
-    final error = flowCore.native.flow_graph_remove_node(
-      handle,
-      nodeId.toNativeUtf8().cast<Char>(),
-    );
-    ErrorHandler.checkErrorCode(error);
+    final cNodeId = nodeId.toNativeUtf8();
+    try {
+      final error = flowCore.native.flow_graph_remove_node(
+        handle,
+        cNodeId.cast<Char>(),
+      );
+      ErrorHandler.checkErrorCode(error);
+    } finally {
+      calloc.free(cNodeId);
+    }
   }
 
   /// Gets a node by its ID.
   ///
   /// Returns the node instance if found, throws [FlowException] otherwise.
   Node getNode(String nodeId) {
-    final nodeHandle = flowCore.native.flow_graph_get_node(
-      handle,
-      nodeId.toNativeUtf8().cast<Char>(),
-    );
-    ErrorHandler.checkError();
-    if (nodeHandle == nullptr) {
-      throw NodeNotFoundException('Node not found with ID: $nodeId');
+    final cNodeId = nodeId.toNativeUtf8();
+    try {
+      final nodeHandle = flowCore.native.flow_graph_get_node(
+        handle,
+        cNodeId.cast<Char>(),
+      );
+      ErrorHandler.checkError();
+      if (nodeHandle == nullptr) {
+        throw NodeNotFoundException('Node not found with ID: $nodeId');
+      }
+      return Node.fromHandle(NodeHandle(nodeHandle.cast()));
+    } finally {
+      calloc.free(cNodeId);
     }
-    return Node.fromHandle(NodeHandle(nodeHandle.cast()));
   }
 
   /// Gets all nodes in the graph.
@@ -150,14 +197,25 @@ class Graph {
     String targetId,
     String targetPort,
   ) {
-    final result = flowCore.native.flow_graph_can_connect(
-      handle,
-      sourceId.toNativeUtf8().cast<Char>(),
-      sourcePort.toNativeUtf8().cast<Char>(),
-      targetId.toNativeUtf8().cast<Char>(),
-      targetPort.toNativeUtf8().cast<Char>(),
-    );
-    return result;
+    final cSourceId = sourceId.toNativeUtf8();
+    final cSourcePort = sourcePort.toNativeUtf8();
+    final cTargetId = targetId.toNativeUtf8();
+    final cTargetPort = targetPort.toNativeUtf8();
+    try {
+      final result = flowCore.native.flow_graph_can_connect(
+        handle,
+        cSourceId.cast<Char>(),
+        cSourcePort.cast<Char>(),
+        cTargetId.cast<Char>(),
+        cTargetPort.cast<Char>(),
+      );
+      return result;
+    } finally {
+      calloc.free(cSourceId);
+      calloc.free(cSourcePort);
+      calloc.free(cTargetId);
+      calloc.free(cTargetPort);
+    }
   }
 
   /// Connects two nodes together.
@@ -173,29 +231,45 @@ class Graph {
     String targetId,
     String targetPort,
   ) {
-    final connHandle = flowCore.native.flow_graph_connect_nodes(
-      handle,
-      sourceId.toNativeUtf8().cast<Char>(),
-      sourcePort.toNativeUtf8().cast<Char>(),
-      targetId.toNativeUtf8().cast<Char>(),
-      targetPort.toNativeUtf8().cast<Char>(),
-    );
-    ErrorHandler.checkError();
-    if (connHandle == nullptr) {
-      throw const ConnectionFailedException('Failed to connect nodes');
+    final cSourceId = sourceId.toNativeUtf8();
+    final cSourcePort = sourcePort.toNativeUtf8();
+    final cTargetId = targetId.toNativeUtf8();
+    final cTargetPort = targetPort.toNativeUtf8();
+    try {
+      final connHandle = flowCore.native.flow_graph_connect_nodes(
+        handle,
+        cSourceId.cast<Char>(),
+        cSourcePort.cast<Char>(),
+        cTargetId.cast<Char>(),
+        cTargetPort.cast<Char>(),
+      );
+      ErrorHandler.checkError();
+      if (connHandle == nullptr) {
+        throw const ConnectionFailedException('Failed to connect nodes');
+      }
+      return Connection.fromHandle(ConnectionHandle(connHandle.cast()));
+    } finally {
+      calloc.free(cSourceId);
+      calloc.free(cSourcePort);
+      calloc.free(cTargetId);
+      calloc.free(cTargetPort);
     }
-    return Connection.fromHandle(ConnectionHandle(connHandle.cast()));
   }
 
   /// Disconnects nodes by removing the specified connection.
   ///
   /// Throws [FlowException] if the disconnection fails.
   void disconnectNodes(String connectionId) {
-    final error = flowCore.native.flow_graph_disconnect_nodes(
-      handle,
-      connectionId.toNativeUtf8().cast<Char>(),
-    );
-    ErrorHandler.checkErrorCode(error);
+    final cConnectionId = connectionId.toNativeUtf8();
+    try {
+      final error = flowCore.native.flow_graph_disconnect_nodes(
+        handle,
+        cConnectionId.cast<Char>(),
+      );
+      ErrorHandler.checkErrorCode(error);
+    } finally {
+      calloc.free(cConnectionId);
+    }
   }
 
   /// Runs the computational graph.
@@ -245,11 +319,16 @@ class Graph {
   ///
   /// Throws [FlowException] if the deserialization fails.
   void loadFromJson(String jsonString) {
-    final error = flowCore.flow_graph_load_from_json(
-      handle,
-      jsonString.toNativeUtf8().cast<Char>(),
-    );
-    ErrorHandler.checkErrorCode(error);
+    final cJsonString = jsonString.toNativeUtf8();
+    try {
+      final error = flowCore.flow_graph_load_from_json(
+        handle,
+        cJsonString.cast<Char>(),
+      );
+      ErrorHandler.checkErrorCode(error);
+    } finally {
+      calloc.free(cJsonString);
+    }
   }
 
   /// Saves the graph state to a JSON object.

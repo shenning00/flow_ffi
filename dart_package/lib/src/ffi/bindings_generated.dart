@@ -282,6 +282,32 @@ class FlowCoreBindings {
       FlowNodeHandle Function(
           FlowGraphHandle, ffi.Pointer<ffi.Char>, ffi.Pointer<ffi.Char>)>();
 
+  FlowNodeHandle flow_graph_add_node_with_uuid(
+    FlowGraphHandle graph,
+    ffi.Pointer<ffi.Char> class_id,
+    ffi.Pointer<ffi.Char> uuid,
+    ffi.Pointer<ffi.Char> name,
+  ) {
+    return _flow_graph_add_node_with_uuid(
+      graph,
+      class_id,
+      uuid,
+      name,
+    );
+  }
+
+  late final _flow_graph_add_node_with_uuidPtr = _lookup<
+      ffi.NativeFunction<
+          FlowNodeHandle Function(
+              FlowGraphHandle,
+              ffi.Pointer<ffi.Char>,
+              ffi.Pointer<ffi.Char>,
+              ffi.Pointer<ffi.Char>)>>('flow_graph_add_node_with_uuid');
+  late final _flow_graph_add_node_with_uuid =
+      _flow_graph_add_node_with_uuidPtr.asFunction<
+          FlowNodeHandle Function(FlowGraphHandle, ffi.Pointer<ffi.Char>,
+              ffi.Pointer<ffi.Char>, ffi.Pointer<ffi.Char>)>();
+
   int flow_graph_remove_node(
     FlowGraphHandle graph,
     ffi.Pointer<ffi.Char> node_id,
@@ -1390,6 +1416,23 @@ class FlowCoreBindings {
   late final _flow_data_get_int = _flow_data_get_intPtr
       .asFunction<int Function(FlowNodeDataHandle, ffi.Pointer<ffi.Int32>)>();
 
+  int flow_data_get_int64(
+    FlowNodeDataHandle data,
+    ffi.Pointer<ffi.Int64> value,
+  ) {
+    return _flow_data_get_int64(
+      data,
+      value,
+    );
+  }
+
+  late final _flow_data_get_int64Ptr = _lookup<
+      ffi.NativeFunction<
+          ffi.Int32 Function(FlowNodeDataHandle,
+              ffi.Pointer<ffi.Int64>)>>('flow_data_get_int64');
+  late final _flow_data_get_int64 = _flow_data_get_int64Ptr
+      .asFunction<int Function(FlowNodeDataHandle, ffi.Pointer<ffi.Int64>)>();
+
   int flow_data_get_double(
     FlowNodeDataHandle data,
     ffi.Pointer<ffi.Double> value,
@@ -1632,6 +1675,117 @@ class FlowCoreBindings {
           'flow_ffi_get_texture_ops');
   late final _flow_ffi_get_texture_ops =
       _flow_ffi_get_texture_opsPtr.asFunction<FlowTextureOps Function()>();
+
+  void flow_ffi_set_gpu_texture_ops(
+    ffi.Pointer<FlowGpuTextureOps> ops,
+  ) {
+    return _flow_ffi_set_gpu_texture_ops(
+      ops,
+    );
+  }
+
+  late final _flow_ffi_set_gpu_texture_opsPtr = _lookup<
+          ffi
+          .NativeFunction<ffi.Void Function(ffi.Pointer<FlowGpuTextureOps>)>>(
+      'flow_ffi_set_gpu_texture_ops');
+  late final _flow_ffi_set_gpu_texture_ops = _flow_ffi_set_gpu_texture_opsPtr
+      .asFunction<void Function(ffi.Pointer<FlowGpuTextureOps>)>();
+
+  int flow_ffi_is_gpu_texture_ops_bound() {
+    return _flow_ffi_is_gpu_texture_ops_bound();
+  }
+
+  late final _flow_ffi_is_gpu_texture_ops_boundPtr =
+      _lookup<ffi.NativeFunction<ffi.Int Function()>>(
+          'flow_ffi_is_gpu_texture_ops_bound');
+  late final _flow_ffi_is_gpu_texture_ops_bound =
+      _flow_ffi_is_gpu_texture_ops_boundPtr.asFunction<int Function()>();
+
+  FlowGpuTextureOps flow_ffi_get_gpu_texture_ops() {
+    return _flow_ffi_get_gpu_texture_ops();
+  }
+
+  late final _flow_ffi_get_gpu_texture_opsPtr =
+      _lookup<ffi.NativeFunction<FlowGpuTextureOps Function()>>(
+          'flow_ffi_get_gpu_texture_ops');
+  late final _flow_ffi_get_gpu_texture_ops = _flow_ffi_get_gpu_texture_opsPtr
+      .asFunction<FlowGpuTextureOps Function()>();
+
+  bool flow_ffi_gpu_texture_sink_available() {
+    return _flow_ffi_gpu_texture_sink_available();
+  }
+
+  late final _flow_ffi_gpu_texture_sink_availablePtr =
+      _lookup<ffi.NativeFunction<ffi.Bool Function()>>(
+          'flow_ffi_gpu_texture_sink_available');
+  late final _flow_ffi_gpu_texture_sink_available =
+      _flow_ffi_gpu_texture_sink_availablePtr.asFunction<bool Function()>();
+
+  int flow_ffi_register_flutter_texture(
+    int w,
+    int h,
+    ffi.Pointer<FlowGpuTextureHandle> out,
+    ffi.Pointer<ffi.Int64> out_texture_id,
+  ) {
+    return _flow_ffi_register_flutter_texture(
+      w,
+      h,
+      out,
+      out_texture_id,
+    );
+  }
+
+  late final _flow_ffi_register_flutter_texturePtr = _lookup<
+      ffi.NativeFunction<
+          ffi.Int32 Function(
+              ffi.Int32,
+              ffi.Int32,
+              ffi.Pointer<FlowGpuTextureHandle>,
+              ffi.Pointer<ffi.Int64>)>>('flow_ffi_register_flutter_texture');
+  late final _flow_ffi_register_flutter_texture =
+      _flow_ffi_register_flutter_texturePtr.asFunction<
+          int Function(int, int, ffi.Pointer<FlowGpuTextureHandle>,
+              ffi.Pointer<ffi.Int64>)>();
+
+  int flow_ffi_unregister_flutter_texture(
+    FlowGpuTextureHandle handle,
+  ) {
+    return _flow_ffi_unregister_flutter_texture(
+      handle,
+    );
+  }
+
+  late final _flow_ffi_unregister_flutter_texturePtr =
+      _lookup<ffi.NativeFunction<ffi.Int32 Function(FlowGpuTextureHandle)>>(
+          'flow_ffi_unregister_flutter_texture');
+  late final _flow_ffi_unregister_flutter_texture =
+      _flow_ffi_unregister_flutter_texturePtr
+          .asFunction<int Function(FlowGpuTextureHandle)>();
+
+  int flow_ffi_upload_to_texture(
+    FlowGpuTextureHandle handle,
+    ffi.Pointer<ffi.Void> host_bytes,
+    int row_stride_bytes,
+    int width,
+    int height,
+  ) {
+    return _flow_ffi_upload_to_texture(
+      handle,
+      host_bytes,
+      row_stride_bytes,
+      width,
+      height,
+    );
+  }
+
+  late final _flow_ffi_upload_to_texturePtr = _lookup<
+      ffi.NativeFunction<
+          ffi.Int32 Function(FlowGpuTextureHandle, ffi.Pointer<ffi.Void>,
+              ffi.Int32, ffi.Int32, ffi.Int32)>>('flow_ffi_upload_to_texture');
+  late final _flow_ffi_upload_to_texture =
+      _flow_ffi_upload_to_texturePtr.asFunction<
+          int Function(
+              FlowGpuTextureHandle, ffi.Pointer<ffi.Void>, int, int, int)>();
 
   void flow_free_string(
     ffi.Pointer<ffi.Char> str,
@@ -2047,6 +2201,10 @@ final class FlowTextureOps extends ffi.Struct {
   external FlowTextureDestroyFn destroy_gl_texture;
 
   external FlowTextureMarkFrameFn mark_frame_available;
+
+  external FlowTextureWaitInitFn wait_initialized;
+
+  external FlowTextureSubmitFrameFn submit_frame;
 }
 
 typedef FlowTextureCreateFn
@@ -2081,6 +2239,94 @@ typedef FlowTextureMarkFrameFnFunction = ffi.Void Function(
     ffi.Pointer<ffi.Void> registrar, ffi.Pointer<ffi.Void> texture_object);
 typedef DartFlowTextureMarkFrameFnFunction = void Function(
     ffi.Pointer<ffi.Void> registrar, ffi.Pointer<ffi.Void> texture_object);
+typedef FlowTextureWaitInitFn
+    = ffi.Pointer<ffi.NativeFunction<FlowTextureWaitInitFnFunction>>;
+typedef FlowTextureWaitInitFnFunction = ffi.Int Function(
+    ffi.Pointer<ffi.Void> texture_object,
+    ffi.Pointer<ffi.Pointer<ffi.Void>> out_cuda_resource);
+typedef DartFlowTextureWaitInitFnFunction = int Function(
+    ffi.Pointer<ffi.Void> texture_object,
+    ffi.Pointer<ffi.Pointer<ffi.Void>> out_cuda_resource);
+typedef FlowTextureSubmitFrameFn
+    = ffi.Pointer<ffi.NativeFunction<FlowTextureSubmitFrameFnFunction>>;
+typedef FlowTextureSubmitFrameFnFunction = ffi.Int Function(
+    ffi.Pointer<ffi.Void> texture_object,
+    ffi.Pointer<ffi.Void> src_device_ptr,
+    ffi.Int32 src_pitch_bytes,
+    ffi.Int32 width,
+    ffi.Int32 height,
+    ffi.Pointer<ffi.Void> ready_event);
+typedef DartFlowTextureSubmitFrameFnFunction = int Function(
+    ffi.Pointer<ffi.Void> texture_object,
+    ffi.Pointer<ffi.Void> src_device_ptr,
+    int src_pitch_bytes,
+    int width,
+    int height,
+    ffi.Pointer<ffi.Void> ready_event);
+
+final class FlowGpuTextureOps extends ffi.Struct {
+  external FlowGpuTextureCreateFn create_texture;
+
+  external FlowGpuTextureDestroyFn destroy_texture;
+
+  external FlowGpuTextureMarkFrameFn mark_frame_available;
+
+  external FlowGpuTextureWaitInitFn wait_initialized;
+
+  external FlowGpuTextureSubmitFrameFn submit_frame;
+}
+
+typedef FlowGpuTextureCreateFn
+    = ffi.Pointer<ffi.NativeFunction<FlowGpuTextureCreateFnFunction>>;
+typedef FlowGpuTextureCreateFnFunction = ffi.Int Function(
+    ffi.Pointer<ffi.Void> registrar,
+    ffi.Int32 width,
+    ffi.Int32 height,
+    ffi.Pointer<ffi.Pointer<ffi.Void>> out_texture_object,
+    ffi.Pointer<ffi.Int64> out_texture_id);
+typedef DartFlowGpuTextureCreateFnFunction = int Function(
+    ffi.Pointer<ffi.Void> registrar,
+    int width,
+    int height,
+    ffi.Pointer<ffi.Pointer<ffi.Void>> out_texture_object,
+    ffi.Pointer<ffi.Int64> out_texture_id);
+typedef FlowGpuTextureDestroyFn
+    = ffi.Pointer<ffi.NativeFunction<FlowGpuTextureDestroyFnFunction>>;
+typedef FlowGpuTextureDestroyFnFunction = ffi.Void Function(
+    ffi.Pointer<ffi.Void> registrar,
+    ffi.Pointer<ffi.Void> texture_object,
+    ffi.Int64 texture_id);
+typedef DartFlowGpuTextureDestroyFnFunction = void Function(
+    ffi.Pointer<ffi.Void> registrar,
+    ffi.Pointer<ffi.Void> texture_object,
+    int texture_id);
+typedef FlowGpuTextureMarkFrameFn
+    = ffi.Pointer<ffi.NativeFunction<FlowGpuTextureMarkFrameFnFunction>>;
+typedef FlowGpuTextureMarkFrameFnFunction = ffi.Void Function(
+    ffi.Pointer<ffi.Void> registrar, ffi.Pointer<ffi.Void> texture_object);
+typedef DartFlowGpuTextureMarkFrameFnFunction = void Function(
+    ffi.Pointer<ffi.Void> registrar, ffi.Pointer<ffi.Void> texture_object);
+typedef FlowGpuTextureWaitInitFn
+    = ffi.Pointer<ffi.NativeFunction<FlowGpuTextureWaitInitFnFunction>>;
+typedef FlowGpuTextureWaitInitFnFunction = ffi.Int Function(
+    ffi.Pointer<ffi.Void> texture_object);
+typedef DartFlowGpuTextureWaitInitFnFunction = int Function(
+    ffi.Pointer<ffi.Void> texture_object);
+typedef FlowGpuTextureSubmitFrameFn
+    = ffi.Pointer<ffi.NativeFunction<FlowGpuTextureSubmitFrameFnFunction>>;
+typedef FlowGpuTextureSubmitFrameFnFunction = ffi.Int Function(
+    ffi.Pointer<ffi.Void> texture_object,
+    ffi.Pointer<ffi.Void> src_bytes,
+    ffi.Int32 row_stride_bytes,
+    ffi.Int32 width,
+    ffi.Int32 height);
+typedef DartFlowGpuTextureSubmitFrameFnFunction = int Function(
+    ffi.Pointer<ffi.Void> texture_object,
+    ffi.Pointer<ffi.Void> src_bytes,
+    int row_stride_bytes,
+    int width,
+    int height);
+typedef FlowGpuTextureHandle = ffi.Pointer<ffi.Void>;
 
 final class FlowEventRegistration extends ffi.Opaque {}
 

@@ -97,6 +97,13 @@ class FlowCoreBindings {
     Pointer<Char> name,
   ) =>
       _flowCore.flow_graph_add_node(graph, classId, name);
+  Pointer<bindings.FlowNode> flow_graph_add_node_with_uuid(
+    Pointer<bindings.FlowGraph> graph,
+    Pointer<Char> classId,
+    Pointer<Char> uuid,
+    Pointer<Char> name,
+  ) =>
+      _flowCore.flow_graph_add_node_with_uuid(graph, classId, uuid, name);
   int flow_graph_remove_node(
           Pointer<bindings.FlowGraph> graph, Pointer<Char> nodeId) =>
       _flowCore.flow_graph_remove_node(graph, nodeId);

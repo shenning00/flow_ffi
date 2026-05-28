@@ -69,6 +69,11 @@ FLOW_FFI_EXPORT FlowNodeHandle flow_factory_create_node(FlowNodeFactoryHandle fa
             return reinterpret_cast<FlowNodeHandle>(
                 flow_ffi::get_or_create_node_handle(node));
 
+        } catch (const std::invalid_argument& e) {
+            flow_ffi::ErrorManager::instance().set_error(
+                FLOW_ERROR_INVALID_ARGUMENT,
+                std::string("Invalid UUID string or argument: ") + e.what());
+            return nullptr;
         } catch (const std::exception& e) {
             flow_ffi::ErrorManager::instance().set_error(
                 FLOW_ERROR_UNKNOWN, std::string("Node creation failed: ") + e.what());
