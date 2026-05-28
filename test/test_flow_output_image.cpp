@@ -95,7 +95,15 @@ TEST_F(FlowOutputImageTest, PortLayoutIsCorrect)
     ASSERT_NE(ch_it, inputs.end()) << "Input port \"channel\" not found";
     EXPECT_EQ(ch_it->second->GetDataType(), flow::TypeName_v<std::string>);
 
-    EXPECT_TRUE(node.GetOutputPorts().empty()) << "FlowOutputImage has no output ports";
+    // FlowOutputImage emits a Flutter texture_id (int64) on its sole output port.
+    // On Linux, fl_texture_get_id returns reinterpret_cast<int64_t>(self), so this
+    // value is pointer-shaped — that is the legitimate Flutter Linux convention,
+    // not a bug.  See ISSUE_6.md for the misdiagnosis history.
+    const auto& outputs = node.GetOutputPorts();
+    ASSERT_EQ(outputs.size(), 1u) << "Expected exactly one output port";
+    auto tex_it = outputs.find(flow::IndexableName{"texture_id"});
+    ASSERT_NE(tex_it, outputs.end()) << "Output port \"texture_id\" not found";
+    EXPECT_EQ(tex_it->second->GetDataType(), flow::TypeName_v<std::int64_t>);
 }
 
 // ---------------------------------------------------------------------------
