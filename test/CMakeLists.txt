@@ -49,10 +49,14 @@ add_executable(flow_ffi_tests
     test_env_add_task_set_input_data.cpp
     test_p10_image_primitives.cpp
     test_image_open_node.cpp
+    # Phase 1: flow_graph_add_node_with_uuid
+    test_graph_add_node_with_uuid.cpp
     # Phase D: CUDA/Flutter texture interop API surface tests
     test_cuda_texture_interop.cpp
     # P12: non-CUDA GPU texture path (always built, no CUDA gate)
     test_flutter_texture_sink.cpp
+    # P15: CPU-host image output sink (always built, no CUDA gate)
+    test_flow_output_image.cpp
 )
 
 # Link libraries
@@ -170,5 +174,30 @@ if(FLOW_FFI_ENABLE_CUDA)
     include(GoogleTest)
     gtest_discover_tests(flow_ffi_flutter_cuda_preview
         TEST_PREFIX "FlowFlutterCudaPreview."
+    )
+
+    # --------------------------------------------------------------------------
+    # P15: FlowCudaOutputImage sink node tests — CUDA builds only.
+    # --------------------------------------------------------------------------
+    add_executable(flow_ffi_cuda_output_image
+        test_flow_cuda_output_image.cpp
+    )
+    target_compile_definitions(flow_ffi_cuda_output_image PRIVATE FLOW_FFI_HAS_CUDA=1)
+    target_link_libraries(flow_ffi_cuda_output_image
+        PRIVATE
+            flow_ffi
+            flow_wire
+            flow-core::flow-core
+            CUDA::cudart
+            gtest_main
+            gtest
+    )
+    target_include_directories(flow_ffi_cuda_output_image
+        PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/../include
+    )
+    include(GoogleTest)
+    gtest_discover_tests(flow_ffi_cuda_output_image
+        TEST_PREFIX "FlowCudaOutputImage."
     )
 endif()

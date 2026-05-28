@@ -146,6 +146,14 @@ FLOW_FFI_EXPORT void flow_graph_destroy(FlowGraphHandle graph);
 FLOW_FFI_EXPORT FlowNodeHandle flow_graph_add_node(FlowGraphHandle graph, const char* class_id,
                                                    const char* name);
 
+// Add a node to the graph with an explicit UUID.
+// If uuid is NULL or empty a fresh UUID is generated (identical to flow_graph_add_node).
+// Returns nullptr and sets FLOW_ERROR_INVALID_ARGUMENT if uuid is non-empty but malformed.
+FLOW_FFI_EXPORT FlowNodeHandle flow_graph_add_node_with_uuid(FlowGraphHandle graph,
+                                                              const char* class_id,
+                                                              const char* uuid,
+                                                              const char* name);
+
 // Remove a node from the graph
 FLOW_FFI_EXPORT FlowError flow_graph_remove_node(FlowGraphHandle graph, const char* node_id);
 

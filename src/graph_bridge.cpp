@@ -75,8 +75,10 @@ FLOW_FFI_EXPORT void flow_graph_destroy(FlowGraphHandle graph) {
     });
 }
 
-FLOW_FFI_EXPORT FlowNodeHandle flow_graph_add_node(FlowGraphHandle graph, const char* class_id,
-                                                   const char* name) {
+FLOW_FFI_EXPORT FlowNodeHandle flow_graph_add_node_with_uuid(FlowGraphHandle graph,
+                                                              const char* class_id,
+                                                              const char* uuid,
+                                                              const char* name) {
     FLOW_API_CALL_HANDLE({
         if (!flow_ffi::validate_handle(graph, "graph") ||
             !flow_ffi::validate_string(class_id, "class_id") ||
@@ -91,6 +93,17 @@ FLOW_FFI_EXPORT FlowNodeHandle flow_graph_add_node(FlowGraphHandle graph, const 
             return nullptr;
         }
 
+        // Parse or generate UUID — guard the user-supplied string.
+        UUID node_uuid;
+        try {
+            node_uuid = (uuid && std::strlen(uuid) > 0) ? UUID(uuid) : UUID();
+        } catch (const std::invalid_argument& e) {
+            flow_ffi::ErrorManager::instance().set_error(
+                FLOW_ERROR_INVALID_ARGUMENT,
+                std::string("Invalid UUID string: ") + e.what());
+            return nullptr;
+        }
+
         // Get the node factory from the graph's environment
         auto factory = (*graph_ptr)->GetEnv()->GetFactory();
         if (!factory) {
@@ -100,7 +113,7 @@ FLOW_FFI_EXPORT FlowNodeHandle flow_graph_add_node(FlowGraphHandle graph, const 
         }
 
         // Step 1: Create the node using the factory (proper two-step workflow)
-        auto node = factory->CreateNode(class_id, UUID(), name, (*graph_ptr)->GetEnv());
+        auto node = factory->CreateNode(class_id, node_uuid, name, (*graph_ptr)->GetEnv());
         if (!node) {
             flow_ffi::ErrorManager::instance().set_error(
                 FLOW_ERROR_NODE_NOT_FOUND,
@@ -109,9 +122,17 @@ FLOW_FFI_EXPORT FlowNodeHandle flow_graph_add_node(FlowGraphHandle graph, const 
         }
 
         // Step 2: Add the pre-created node to the graph (as expected by flow-core)
-        (*graph_ptr)->AddNode(node);
+        try {
+            (*graph_ptr)->AddNode(node);
+        } catch (const std::exception& e) {
+            flow_ffi::ErrorManager::instance().set_error(
+                FLOW_ERROR_UNKNOWN,
+                std::string("Graph::AddNode failed: ") + e.what());
+            return nullptr;
+        }
 
-        // Verify node was added successfully by checking if we can retrieve it
+        // Verify node was added — on duplicate-UUID emplace, GetNode returns
+        // the canonical winner, not the node pointer we just constructed.
         auto verifyNode = (*graph_ptr)->GetNode(node->ID());
         if (!verifyNode) {
             flow_ffi::ErrorManager::instance().set_error(FLOW_ERROR_NODE_NOT_FOUND,
@@ -121,8 +142,13 @@ FLOW_FFI_EXPORT FlowNodeHandle flow_graph_add_node(FlowGraphHandle graph, const 
 
         flow_ffi::ErrorManager::instance().clear_error();
         return reinterpret_cast<FlowNodeHandle>(
-            flow_ffi::get_or_create_node_handle(node));
+            flow_ffi::get_or_create_node_handle(verifyNode));  // verifyNode, NOT node
     });
+}
+
+FLOW_FFI_EXPORT FlowNodeHandle flow_graph_add_node(FlowGraphHandle graph, const char* class_id,
+                                                   const char* name) {
+    return flow_graph_add_node_with_uuid(graph, class_id, nullptr, name);
 }
 
 FLOW_FFI_EXPORT FlowError flow_graph_remove_node(FlowGraphHandle graph, const char* node_id) {
