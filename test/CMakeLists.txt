@@ -132,7 +132,6 @@ if(FLOW_FFI_ENABLE_CUDA)
     target_link_libraries(flow_ffi_cuda_to_image_bridge
         PRIVATE
             flow_ffi
-            flow_wire
             flow-core::flow-core
             CUDA::cudart
     )
@@ -161,7 +160,6 @@ if(FLOW_FFI_ENABLE_CUDA)
     target_link_libraries(flow_ffi_flutter_cuda_preview
         PRIVATE
             flow_ffi
-            flow_wire
             flow-core::flow-core
             CUDA::cudart
             gtest_main
@@ -186,7 +184,6 @@ if(FLOW_FFI_ENABLE_CUDA)
     target_link_libraries(flow_ffi_cuda_output_image
         PRIVATE
             flow_ffi
-            flow_wire
             flow-core::flow-core
             CUDA::cudart
             gtest_main

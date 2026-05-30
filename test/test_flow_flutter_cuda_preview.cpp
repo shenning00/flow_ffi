@@ -33,9 +33,9 @@
 #include <flow/core/NodeFactory.hpp>
 #include <flow/core/UUID.hpp>
 
-#include <flow_wire/CudaDeviceImage.hpp>
-#include <flow_wire/FlowFlutterCudaPreview.hpp>
-#include <flow_wire/Register.hpp>
+#include <wire/CudaDeviceImage.hpp>
+#include <wire/FlowFlutterCudaPreview.hpp>
+#include <wire/Register.hpp>
 
 #include <gtest/gtest.h>
 
@@ -132,14 +132,14 @@ static std::shared_ptr<flow::Env> make_env()
     return flow::Env::Create(factory, settings);
 }
 
-// Build a minimal flow::Env with all flow_wire nodes registered.
+// Build a minimal flow::Env with all wire nodes registered.
 static std::shared_ptr<flow::Env> make_env_with_registry()
 {
     auto factory = std::make_shared<flow::NodeFactory>();
     flow::Settings settings;
     settings.MaxThreads = 1;
     auto env            = flow::Env::Create(factory, settings);
-    flow_wire::RegisterAllNodes(*env);
+    wire::RegisterAllNodes(*env);
     return env;
 }
 

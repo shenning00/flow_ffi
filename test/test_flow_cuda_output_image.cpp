@@ -15,9 +15,9 @@
 #include <flow/core/NodeFactory.hpp>
 #include <flow/core/UUID.hpp>
 
-#include <flow_wire/CudaDeviceImage.hpp>
-#include <flow_wire/FlowCudaOutputImage.hpp>
-#include <flow_wire/Register.hpp>
+#include <wire/CudaDeviceImage.hpp>
+#include <wire/FlowCudaOutputImage.hpp>
+#include <wire/Register.hpp>
 
 #include <gtest/gtest.h>
 
@@ -113,7 +113,7 @@ static std::shared_ptr<flow::Env> make_env()
 static std::shared_ptr<flow::Env> make_env_with_registry()
 {
     auto env = make_env();
-    flow_wire::RegisterAllNodes(*env);
+    wire::RegisterAllNodes(*env);
     return env;
 }
 

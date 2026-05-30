@@ -7,7 +7,7 @@
 #include <cstring>
 #include <string>
 
-#include <flow_wire/Register.hpp>
+#include <wire/Register.hpp>
 
 #include "env_wrapper.hpp"
 #include "error_handling.hpp"
@@ -45,9 +45,9 @@ extern "C"
 
             // Register the wire-type builtin nodes (ImageOpenNode, PreviewNode)
             // and any optionally-compiled adapter nodes (cv::Mat ↔ flow::Image
-            // when FLOW_INTERWORK_WITH_OPENCV is set in the flow_wire build).
-            // See flow_wire/Register.hpp.
-            flow_wire::RegisterAllNodes(*env);
+            // when FLOW_INTERWORK_WITH_OPENCV is set in the wire build).
+            // See wire/Register.hpp.
+            wire::RegisterAllNodes(*env);
 
             // Create wrapper and handle
             auto wrapper = EnvWrapper(env);
