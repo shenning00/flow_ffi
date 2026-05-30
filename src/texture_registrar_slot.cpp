@@ -17,18 +17,22 @@
 // additional fences.
 static std::atomic<void*> g_texture_registrar{nullptr};
 
-extern "C" {
+extern "C"
+{
 
-FLOW_FFI_EXPORT void flow_ffi_set_texture_registrar(void* registrar) {
-    g_texture_registrar.store(registrar, std::memory_order_seq_cst);
-}
+    FLOW_FFI_EXPORT void flow_ffi_set_texture_registrar(void* registrar)
+    {
+        g_texture_registrar.store(registrar, std::memory_order_seq_cst);
+    }
 
-FLOW_FFI_EXPORT void* flow_ffi_get_texture_registrar(void) {
-    return g_texture_registrar.load(std::memory_order_seq_cst);
-}
+    FLOW_FFI_EXPORT void* flow_ffi_get_texture_registrar(void)
+    {
+        return g_texture_registrar.load(std::memory_order_seq_cst);
+    }
 
-FLOW_FFI_EXPORT int flow_ffi_is_texture_registrar_bound(void) {
-    return g_texture_registrar.load(std::memory_order_seq_cst) != nullptr ? 1 : 0;
-}
+    FLOW_FFI_EXPORT int flow_ffi_is_texture_registrar_bound(void)
+    {
+        return g_texture_registrar.load(std::memory_order_seq_cst) != nullptr ? 1 : 0;
+    }
 
 } // extern "C"

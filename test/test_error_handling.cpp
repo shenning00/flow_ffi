@@ -5,14 +5,16 @@
 #include "error_handling.hpp"
 #include <gtest/gtest.h>
 
-class ErrorHandlingTest : public ::testing::Test {
-protected:
+class ErrorHandlingTest : public ::testing::Test
+{
+  protected:
     void SetUp() override { flow_clear_error(); }
 
     void TearDown() override { flow_clear_error(); }
 };
 
-TEST_F(ErrorHandlingTest, BasicErrorOperations) {
+TEST_F(ErrorHandlingTest, BasicErrorOperations)
+{
     // Initially, there should be no error
     EXPECT_EQ(flow_get_last_error(), nullptr);
 
@@ -30,7 +32,8 @@ TEST_F(ErrorHandlingTest, BasicErrorOperations) {
     EXPECT_EQ(flow_get_last_error(), nullptr);
 }
 
-TEST_F(ErrorHandlingTest, ThreadLocalErrors) {
+TEST_F(ErrorHandlingTest, ThreadLocalErrors)
+{
     // Set error in main thread
     flow_set_error(FLOW_ERROR_INVALID_ARGUMENT, "Main thread error");
 
@@ -46,14 +49,16 @@ TEST_F(ErrorHandlingTest, ThreadLocalErrors) {
         flow_set_error(FLOW_ERROR_NODE_NOT_FOUND, "Other thread error");
 
         const char* error_msg = flow_get_last_error();
-        if (error_msg) {
+        if (error_msg)
+        {
             other_thread_error = error_msg;
         }
     });
 
     // Main thread should still have its error
     const char* error_msg = flow_get_last_error();
-    if (error_msg) {
+    if (error_msg)
+    {
         main_thread_error = error_msg;
     }
 
@@ -63,7 +68,8 @@ TEST_F(ErrorHandlingTest, ThreadLocalErrors) {
     EXPECT_EQ(other_thread_error, "Other thread error");
 }
 
-TEST_F(ErrorHandlingTest, ErrorManager) {
+TEST_F(ErrorHandlingTest, ErrorManager)
+{
     auto& manager = flow_ffi::ErrorManager::instance();
 
     // Initially no error
@@ -83,7 +89,8 @@ TEST_F(ErrorHandlingTest, ErrorManager) {
     EXPECT_EQ(manager.get_last_error_code(), FLOW_SUCCESS);
 }
 
-TEST_F(ErrorHandlingTest, ValidationHelpers) {
+TEST_F(ErrorHandlingTest, ValidationHelpers)
+{
     // Test handle validation
     EXPECT_FALSE(flow_ffi::validate_handle(nullptr, "test_handle"));
 
@@ -116,7 +123,7 @@ TEST_F(ErrorHandlingTest, ValidationHelpers) {
     flow_clear_error();
 
     // Test with valid inputs
-    int dummy_int = 42;
+    int dummy_int            = 42;
     const char* dummy_string = "valid";
 
     EXPECT_TRUE(flow_ffi::validate_string(dummy_string, "valid_string"));
@@ -126,7 +133,8 @@ TEST_F(ErrorHandlingTest, ValidationHelpers) {
     EXPECT_EQ(flow_get_last_error(), nullptr);
 }
 
-TEST_F(ErrorHandlingTest, ErrorSetterRAII) {
+TEST_F(ErrorHandlingTest, ErrorSetterRAII)
+{
     // Test normal completion without exception
     {
         flow_ffi::ErrorSetter setter;
@@ -155,7 +163,8 @@ TEST_F(ErrorHandlingTest, ErrorSetterRAII) {
     EXPECT_EQ(flow_get_last_error(), nullptr);
 }
 
-TEST_F(ErrorHandlingTest, NullMessageHandling) {
+TEST_F(ErrorHandlingTest, NullMessageHandling)
+{
     // Test setting error with null message
     flow_set_error(FLOW_ERROR_UNKNOWN, nullptr);
 
@@ -166,7 +175,8 @@ TEST_F(ErrorHandlingTest, NullMessageHandling) {
     flow_clear_error();
 }
 
-TEST_F(ErrorHandlingTest, MultipleErrorsOverwrite) {
+TEST_F(ErrorHandlingTest, MultipleErrorsOverwrite)
+{
     // Set first error
     flow_set_error(FLOW_ERROR_INVALID_HANDLE, "First error");
 

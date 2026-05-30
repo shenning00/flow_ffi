@@ -10,33 +10,26 @@
 // Calling any of these in a non-CUDA build returns FLOW_ERROR_NOT_IMPLEMENTED
 // (for the FlowError-returning functions) or is a no-op (signal_frame_available).
 
-#include "flow_ffi_cuda.h"
 #include "flow_ffi.h"
+#include "flow_ffi_cuda.h"
 
-extern "C" FlowError flow_ffi_register_cuda_flutter_texture(
-    int32_t               /*width*/,
-    int32_t               /*height*/,
-    FlowCudaTextureHandle* out_handle,
-    int64_t*              out_flutter_texture_id)
+extern "C" FlowError flow_ffi_register_cuda_flutter_texture(int32_t /*width*/, int32_t /*height*/,
+                                                            FlowCudaTextureHandle* out_handle,
+                                                            int64_t* out_flutter_texture_id)
 {
-    if (out_handle)             *out_handle             = nullptr;
+    if (out_handle) *out_handle = nullptr;
     if (out_flutter_texture_id) *out_flutter_texture_id = -1;
     return FLOW_ERROR_NOT_IMPLEMENTED;
 }
 
-extern "C" FlowError flow_ffi_unregister_cuda_flutter_texture(
-    FlowCudaTextureHandle /*handle*/)
+extern "C" FlowError flow_ffi_unregister_cuda_flutter_texture(FlowCudaTextureHandle /*handle*/)
 {
     return FLOW_ERROR_NOT_IMPLEMENTED;
 }
 
-extern "C" FlowError flow_ffi_cuda_write_into(
-    FlowCudaTextureHandle /*handle*/,
-    const void*           /*src_device_ptr*/,
-    int32_t               /*src_pitch_bytes*/,
-    int32_t               /*width*/,
-    int32_t               /*height*/,
-    void*                 /*producer_ready_event*/)
+extern "C" FlowError flow_ffi_cuda_write_into(FlowCudaTextureHandle /*handle*/, const void* /*src_device_ptr*/,
+                                              int32_t /*src_pitch_bytes*/, int32_t /*width*/, int32_t /*height*/,
+                                              void* /*producer_ready_event*/)
 {
     return FLOW_ERROR_NOT_IMPLEMENTED;
 }

@@ -9,9 +9,11 @@
 
 namespace fs = std::filesystem;
 
-class ModuleTest : public ::testing::Test {
-protected:
-    void SetUp() override {
+class ModuleTest : public ::testing::Test
+{
+  protected:
+    void SetUp() override
+    {
         env_ = flow_env_create(2);
         ASSERT_NE(env_, nullptr);
 
@@ -19,20 +21,24 @@ protected:
         ASSERT_NE(factory_, nullptr);
     }
 
-    void TearDown() override {
-        if (factory_) {
+    void TearDown() override
+    {
+        if (factory_)
+        {
             flow_release_handle(factory_);
         }
-        if (env_) {
+        if (env_)
+        {
             flow_env_destroy(env_);
         }
     }
 
-    FlowEnvHandle env_ = nullptr;
+    FlowEnvHandle env_             = nullptr;
     FlowNodeFactoryHandle factory_ = nullptr;
 };
 
-TEST_F(ModuleTest, ModuleCreationAndDestruction) {
+TEST_F(ModuleTest, ModuleCreationAndDestruction)
+{
     // Create module
     auto module = flow_module_create(factory_);
     ASSERT_NE(module, nullptr);
@@ -51,7 +57,8 @@ TEST_F(ModuleTest, ModuleCreationAndDestruction) {
     EXPECT_FALSE(flow_is_valid_handle(module));
 }
 
-TEST_F(ModuleTest, ModuleCreationWithInvalidFactory) {
+TEST_F(ModuleTest, ModuleCreationWithInvalidFactory)
+{
     // Try to create module with null factory
     auto module = flow_module_create(nullptr);
     EXPECT_EQ(module, nullptr);
@@ -61,7 +68,8 @@ TEST_F(ModuleTest, ModuleCreationWithInvalidFactory) {
     EXPECT_NE(std::string(error).find("Invalid factory handle"), std::string::npos);
 }
 
-TEST_F(ModuleTest, ModuleLoadWithInvalidHandle) {
+TEST_F(ModuleTest, ModuleLoadWithInvalidHandle)
+{
     // Test with null handle
     auto result = flow_module_load(nullptr, "/some/path");
     EXPECT_EQ(result, FLOW_ERROR_INVALID_ARGUMENT);
@@ -70,7 +78,8 @@ TEST_F(ModuleTest, ModuleLoadWithInvalidHandle) {
     EXPECT_NE(error, nullptr);
 }
 
-TEST_F(ModuleTest, ModuleLoadWithInvalidPath) {
+TEST_F(ModuleTest, ModuleLoadWithInvalidPath)
+{
     auto module = flow_module_create(factory_);
     ASSERT_NE(module, nullptr);
 
@@ -89,7 +98,8 @@ TEST_F(ModuleTest, ModuleLoadWithInvalidPath) {
     flow_module_destroy(module);
 }
 
-TEST_F(ModuleTest, ModuleUnloadWhenNotLoaded) {
+TEST_F(ModuleTest, ModuleUnloadWhenNotLoaded)
+{
     auto module = flow_module_create(factory_);
     ASSERT_NE(module, nullptr);
 
@@ -100,7 +110,8 @@ TEST_F(ModuleTest, ModuleUnloadWhenNotLoaded) {
     flow_module_destroy(module);
 }
 
-TEST_F(ModuleTest, ModuleUnloadWithInvalidHandle) {
+TEST_F(ModuleTest, ModuleUnloadWithInvalidHandle)
+{
     auto result = flow_module_unload(nullptr);
     EXPECT_EQ(result, FLOW_ERROR_INVALID_ARGUMENT);
 
@@ -108,7 +119,8 @@ TEST_F(ModuleTest, ModuleUnloadWithInvalidHandle) {
     EXPECT_NE(error, nullptr);
 }
 
-TEST_F(ModuleTest, ModuleRegisterNodesWhenNotLoaded) {
+TEST_F(ModuleTest, ModuleRegisterNodesWhenNotLoaded)
+{
     auto module = flow_module_create(factory_);
     ASSERT_NE(module, nullptr);
 
@@ -123,7 +135,8 @@ TEST_F(ModuleTest, ModuleRegisterNodesWhenNotLoaded) {
     flow_module_destroy(module);
 }
 
-TEST_F(ModuleTest, ModuleUnregisterNodesWhenNotLoaded) {
+TEST_F(ModuleTest, ModuleUnregisterNodesWhenNotLoaded)
+{
     auto module = flow_module_create(factory_);
     ASSERT_NE(module, nullptr);
 
@@ -137,7 +150,8 @@ TEST_F(ModuleTest, ModuleUnregisterNodesWhenNotLoaded) {
     flow_module_destroy(module);
 }
 
-TEST_F(ModuleTest, ModuleRegisterWithInvalidHandle) {
+TEST_F(ModuleTest, ModuleRegisterWithInvalidHandle)
+{
     auto result = flow_module_register_nodes(nullptr);
     EXPECT_EQ(result, FLOW_ERROR_INVALID_ARGUMENT);
 
@@ -145,12 +159,14 @@ TEST_F(ModuleTest, ModuleRegisterWithInvalidHandle) {
     EXPECT_EQ(result, FLOW_ERROR_INVALID_ARGUMENT);
 }
 
-TEST_F(ModuleTest, ModuleIsLoadedWithInvalidHandle) {
+TEST_F(ModuleTest, ModuleIsLoadedWithInvalidHandle)
+{
     // Should return false for null handle
     EXPECT_FALSE(flow_module_is_loaded(nullptr));
 }
 
-TEST_F(ModuleTest, ModuleMetadataWithInvalidHandle) {
+TEST_F(ModuleTest, ModuleMetadataWithInvalidHandle)
+{
     // Should return nullptr for null handle
     EXPECT_EQ(flow_module_get_name(nullptr), nullptr);
     EXPECT_EQ(flow_module_get_version(nullptr), nullptr);
@@ -158,7 +174,8 @@ TEST_F(ModuleTest, ModuleMetadataWithInvalidHandle) {
     EXPECT_EQ(flow_module_get_description(nullptr), nullptr);
 }
 
-TEST_F(ModuleTest, ModuleRefCountManagement) {
+TEST_F(ModuleTest, ModuleRefCountManagement)
+{
     auto module = flow_module_create(factory_);
     ASSERT_NE(module, nullptr);
 
@@ -178,7 +195,8 @@ TEST_F(ModuleTest, ModuleRefCountManagement) {
     flow_module_destroy(module);
 }
 
-TEST_F(ModuleTest, ModuleHandleValidation) {
+TEST_F(ModuleTest, ModuleHandleValidation)
+{
     auto module = flow_module_create(factory_);
     ASSERT_NE(module, nullptr);
 
@@ -194,7 +212,8 @@ TEST_F(ModuleTest, ModuleHandleValidation) {
     EXPECT_FALSE(flow_is_valid_handle(module));
 }
 
-TEST_F(ModuleTest, ErrorHandling) {
+TEST_F(ModuleTest, ErrorHandling)
+{
     flow_clear_error();
 
     // Test that error messages are properly set
@@ -211,7 +230,8 @@ TEST_F(ModuleTest, ErrorHandling) {
     EXPECT_EQ(error, nullptr);
 }
 
-TEST_F(ModuleTest, MultipleModules) {
+TEST_F(ModuleTest, MultipleModules)
+{
     auto module1 = flow_module_create(factory_);
     auto module2 = flow_module_create(factory_);
 
@@ -232,7 +252,8 @@ TEST_F(ModuleTest, MultipleModules) {
 
 // Integration test for the complete module lifecycle
 // Note: This test will fail until actual .fmod modules are available for testing
-TEST_F(ModuleTest, DISABLED_CompleteModuleLifecycle) {
+TEST_F(ModuleTest, DISABLED_CompleteModuleLifecycle)
+{
     auto module = flow_module_create(factory_);
     ASSERT_NE(module, nullptr);
 
@@ -245,9 +266,9 @@ TEST_F(ModuleTest, DISABLED_CompleteModuleLifecycle) {
     EXPECT_TRUE(flow_module_is_loaded(module));
 
     // Check metadata
-    const char* name = flow_module_get_name(module);
-    const char* version = flow_module_get_version(module);
-    const char* author = flow_module_get_author(module);
+    const char* name        = flow_module_get_name(module);
+    const char* version     = flow_module_get_version(module);
+    const char* author      = flow_module_get_author(module);
     const char* description = flow_module_get_description(module);
 
     EXPECT_NE(name, nullptr);

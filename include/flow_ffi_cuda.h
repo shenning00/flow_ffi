@@ -24,65 +24,59 @@
 // Passing nullptr means "no synchronization" — the implementation will skip
 // cudaStreamWaitEvent.
 
-#include "flow_ffi.h"  // FlowError, FLOW_FFI_EXPORT
+#include "flow_ffi.h" // FlowError, FLOW_FFI_EXPORT
 
 #ifdef __cplusplus
-extern "C" {
+extern "C"
+{
 #endif
 
-// Opaque handle representing a registered Flutter texture + CUDA interop state.
-typedef void* FlowCudaTextureHandle;
+    // Opaque handle representing a registered Flutter texture + CUDA interop state.
+    typedef void* FlowCudaTextureHandle;
 
-// ============================================================================
-// Capability discovery — always safe to call, even when FLOW_FFI_HAS_CUDA=0
-// ============================================================================
+    // ============================================================================
+    // Capability discovery — always safe to call, even when FLOW_FFI_HAS_CUDA=0
+    // ============================================================================
 
-FLOW_FFI_EXPORT bool        flow_ffi_cuda_available(void);
-FLOW_FFI_EXPORT int         flow_ffi_cuda_device_count(void);
-// Returns a borrowed string valid for the lifetime of the process.
-// Returns "" for out-of-range indices or when CUDA is not available.
-FLOW_FFI_EXPORT const char* flow_ffi_cuda_device_name(int device);
+    FLOW_FFI_EXPORT bool flow_ffi_cuda_available(void);
+    FLOW_FFI_EXPORT int flow_ffi_cuda_device_count(void);
+    // Returns a borrowed string valid for the lifetime of the process.
+    // Returns "" for out-of-range indices or when CUDA is not available.
+    FLOW_FFI_EXPORT const char* flow_ffi_cuda_device_name(int device);
 
-// ============================================================================
-// Texture registration
-// ============================================================================
+    // ============================================================================
+    // Texture registration
+    // ============================================================================
 
-// Allocate a platform texture (GL/D3D11/Vulkan per platform) sized w*h RGBA8,
-// register it with Flutter's TextureRegistry, and interop-register it with
-// CUDA so flow_ffi_cuda_write_into can target it.
-// On success, *out_handle and *out_flutter_texture_id are populated.
-// Phase D will implement the bodies; currently returns FLOW_ERROR_NOT_IMPLEMENTED.
-FLOW_FFI_EXPORT FlowError flow_ffi_register_cuda_flutter_texture(
-    int32_t               width,
-    int32_t               height,
-    FlowCudaTextureHandle* out_handle,
-    int64_t*              out_flutter_texture_id);
+    // Allocate a platform texture (GL/D3D11/Vulkan per platform) sized w*h RGBA8,
+    // register it with Flutter's TextureRegistry, and interop-register it with
+    // CUDA so flow_ffi_cuda_write_into can target it.
+    // On success, *out_handle and *out_flutter_texture_id are populated.
+    // Phase D will implement the bodies; currently returns FLOW_ERROR_NOT_IMPLEMENTED.
+    FLOW_FFI_EXPORT FlowError flow_ffi_register_cuda_flutter_texture(int32_t width, int32_t height,
+                                                                     FlowCudaTextureHandle* out_handle,
+                                                                     int64_t* out_flutter_texture_id);
 
-FLOW_FFI_EXPORT FlowError flow_ffi_unregister_cuda_flutter_texture(
-    FlowCudaTextureHandle handle);
+    FLOW_FFI_EXPORT FlowError flow_ffi_unregister_cuda_flutter_texture(FlowCudaTextureHandle handle);
 
-// ============================================================================
-// Per-frame write
-// ============================================================================
+    // ============================================================================
+    // Per-frame write
+    // ============================================================================
 
-// Copy from a CUDA device buffer into the registered texture, synchronizing
-// against the producer's ready event.  Called from
-// FlowFlutterCudaPreview::Compute() (Phase E).
-//
-// producer_ready_event: cast from cudaEvent_t; may be nullptr (no sync).
-// Phase D will implement the body; currently returns FLOW_ERROR_NOT_IMPLEMENTED.
-FLOW_FFI_EXPORT FlowError flow_ffi_cuda_write_into(
-    FlowCudaTextureHandle handle,
-    const void*           src_device_ptr,
-    int32_t               src_pitch_bytes,
-    int32_t               width,
-    int32_t               height,
-    void*                 producer_ready_event);
+    // Copy from a CUDA device buffer into the registered texture, synchronizing
+    // against the producer's ready event.  Called from
+    // FlowFlutterCudaPreview::Compute() (Phase E).
+    //
+    // producer_ready_event: cast from cudaEvent_t; may be nullptr (no sync).
+    // Phase D will implement the body; currently returns FLOW_ERROR_NOT_IMPLEMENTED.
+    FLOW_FFI_EXPORT FlowError flow_ffi_cuda_write_into(FlowCudaTextureHandle handle, const void* src_device_ptr,
+                                                       int32_t src_pitch_bytes, int32_t width, int32_t height,
+                                                       void* producer_ready_event);
 
-// Signal Flutter that a new frame is ready on the given texture id.
-// The Texture widget will rebuild on the next pump.
-// Phase D will implement the body; currently a no-op.
-FLOW_FFI_EXPORT void flow_ffi_signal_frame_available(int64_t flutter_texture_id);
+    // Signal Flutter that a new frame is ready on the given texture id.
+    // The Texture widget will rebuild on the next pump.
+    // Phase D will implement the body; currently a no-op.
+    FLOW_FFI_EXPORT void flow_ffi_signal_frame_available(int64_t flutter_texture_id);
 
 #ifdef __cplusplus
 }

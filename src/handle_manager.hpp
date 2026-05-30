@@ -7,24 +7,27 @@
 #include <typeinfo>
 #include <unordered_map>
 
-#include <flow/core/Node.hpp>   // for flow::Node* secondary-index key
+#include <flow/core/Node.hpp> // for flow::Node* secondary-index key
 
 // NodeWrapper must be visible here so the inline get_or_create_node_handle and
 // unregister_handle implementations can name Handle<NodeWrapper>.  node_wrapper.hpp
 // is guarded by #pragma once, so TUs that already include it get a no-op.
 #include "node_wrapper.hpp"
 
-namespace flow_ffi {
+namespace flow_ffi
+{
 
 // Base class for all managed handles
-class HandleBase {
-public:
+class HandleBase
+{
+  public:
     HandleBase() : ref_count_(1) {}
     virtual ~HandleBase() = default;
 
     void retain() { ref_count_.fetch_add(1, std::memory_order_relaxed); }
 
-    bool release() {
+    bool release()
+    {
         int old_count = ref_count_.fetch_sub(1, std::memory_order_acq_rel);
         return old_count == 1; // Returns true if this was the last reference
     }
@@ -33,53 +36,62 @@ public:
 
     virtual const char* get_type_name() const = 0;
 
-private:
+  private:
     std::atomic<int32_t> ref_count_;
 };
 
 // Template wrapper for specific handle types
-template <typename T>
-class Handle : public HandleBase {
-public:
-    template <typename... Args>
-    Handle(Args&&... args) : object_(std::forward<Args>(args)...) {}
+template<typename T>
+class Handle : public HandleBase
+{
+  public:
+    template<typename... Args>
+    Handle(Args&&... args) : object_(std::forward<Args>(args)...)
+    {
+    }
 
     T& get() { return object_; }
     const T& get() const { return object_; }
 
     const char* get_type_name() const override { return typeid(T).name(); }
 
-private:
+  private:
     T object_;
 };
 
 // Thread-safe handle registry
-class HandleRegistry {
-public:
-    static HandleRegistry& instance() {
+class HandleRegistry
+{
+  public:
+    static HandleRegistry& instance()
+    {
         static HandleRegistry registry;
         return registry;
     }
 
     // Register a new handle
-    void* register_handle(std::unique_ptr<HandleBase> handle) {
+    void* register_handle(std::unique_ptr<HandleBase> handle)
+    {
         std::lock_guard<std::mutex> lock(mutex_);
-        void* ptr = handle.get();
+        void* ptr     = handle.get();
         handles_[ptr] = std::move(handle);
         return ptr;
     }
 
     // Get a handle (returns nullptr if not found or wrong type)
-    template <typename T>
-    T* get_handle(void* ptr) {
+    template<typename T>
+    T* get_handle(void* ptr)
+    {
         std::lock_guard<std::mutex> lock(mutex_);
         auto it = handles_.find(ptr);
-        if (it == handles_.end()) {
+        if (it == handles_.end())
+        {
             return nullptr;
         }
 
         auto* handle = dynamic_cast<Handle<T>*>(it->second.get());
-        if (!handle) {
+        if (!handle)
+        {
             return nullptr;
         }
 
@@ -87,27 +99,31 @@ public:
     }
 
     // Get raw handle base (for reference counting)
-    HandleBase* get_handle_base(void* ptr) {
+    HandleBase* get_handle_base(void* ptr)
+    {
         std::lock_guard<std::mutex> lock(mutex_);
         auto it = handles_.find(ptr);
         return (it != handles_.end()) ? it->second.get() : nullptr;
     }
 
     // Check if handle exists
-    bool is_valid_handle(void* ptr) {
+    bool is_valid_handle(void* ptr)
+    {
         std::lock_guard<std::mutex> lock(mutex_);
         return handles_.find(ptr) != handles_.end();
     }
 
     // Remove handle (called when reference count reaches 0)
-    void unregister_handle(void* ptr) {
+    void unregister_handle(void* ptr)
+    {
         std::lock_guard<std::mutex> lock(mutex_);
         auto it = handles_.find(ptr);
         if (it == handles_.end()) return;
 
         // If this is a NodeWrapper handle, remove from the secondary index too.
         // dynamic_cast is safe here: we hold the unique_ptr and the object is live.
-        if (auto* node_handle = dynamic_cast<Handle<NodeWrapper>*>(it->second.get())) {
+        if (auto* node_handle = dynamic_cast<Handle<NodeWrapper>*>(it->second.get()))
+        {
             flow::Node* identity = node_handle->get().node.get();
             node_handles_.erase(identity);
         }
@@ -117,13 +133,15 @@ public:
     }
 
     // Get handle count (for debugging/testing)
-    size_t get_handle_count() const {
+    size_t get_handle_count() const
+    {
         std::lock_guard<std::mutex> lock(mutex_);
         return handles_.size();
     }
 
     // Clear all handles (for testing)
-    void clear() {
+    void clear()
+    {
         std::lock_guard<std::mutex> lock(mutex_);
         handles_.clear();
         node_handles_.clear();
@@ -134,15 +152,17 @@ public:
     // the number of outstanding Dart owning wrappers.
     //
     // Thread safety: acquires mutex_ once for the entire operation.
-    void* get_or_create_node_handle(flow::SharedNode node) {
-        flow::Node* identity = node.get();  // stable raw pointer
+    void* get_or_create_node_handle(flow::SharedNode node)
+    {
+        flow::Node* identity = node.get(); // stable raw pointer
 
         std::lock_guard<std::mutex> lock(mutex_);
 
         auto sec_it = node_handles_.find(identity);
-        if (sec_it != node_handles_.end()) {
+        if (sec_it != node_handles_.end())
+        {
             // Canonical handle already exists. Retain for the new hand-out.
-            void* ptr = sec_it->second;
+            void* ptr   = sec_it->second;
             auto pri_it = handles_.find(ptr);
             // pri_it must be valid if secondary index is consistent
             pri_it->second->retain();
@@ -152,15 +172,15 @@ public:
         // First time this node is seen: create the canonical handle.
         // Handle<NodeWrapper> constructor sets ref_count_ = 1, which accounts
         // for this first hand-out. No extra retain() needed here.
-        auto handle = std::make_unique<Handle<NodeWrapper>>(std::move(node));
-        void* ptr = handle.get();
-        handles_[ptr] = std::move(handle);
+        auto handle             = std::make_unique<Handle<NodeWrapper>>(std::move(node));
+        void* ptr               = handle.get();
+        handles_[ptr]           = std::move(handle);
         node_handles_[identity] = ptr;
         return ptr;
     }
 
-private:
-    HandleRegistry() = default;
+  private:
+    HandleRegistry()  = default;
     ~HandleRegistry() = default;
 
     mutable std::mutex mutex_;
@@ -172,30 +192,35 @@ private:
 
 // Helper functions for creating and managing handles
 
-template <typename T, typename... Args>
-void* create_handle(Args&&... args) {
+template<typename T, typename... Args>
+void* create_handle(Args&&... args)
+{
     auto handle = std::make_unique<Handle<T>>(std::forward<Args>(args)...);
     return HandleRegistry::instance().register_handle(std::move(handle));
 }
 
-template <typename T>
-T* get_handle(void* ptr) {
+template<typename T>
+T* get_handle(void* ptr)
+{
     return HandleRegistry::instance().get_handle<T>(ptr);
 }
 
-inline bool is_valid_handle(void* ptr) {
-    return HandleRegistry::instance().is_valid_handle(ptr);
-}
+inline bool is_valid_handle(void* ptr) { return HandleRegistry::instance().is_valid_handle(ptr); }
 
-inline void retain_handle(void* ptr) {
-    if (auto* handle = HandleRegistry::instance().get_handle_base(ptr)) {
+inline void retain_handle(void* ptr)
+{
+    if (auto* handle = HandleRegistry::instance().get_handle_base(ptr))
+    {
         handle->retain();
     }
 }
 
-inline bool release_handle(void* ptr) {
-    if (auto* handle = HandleRegistry::instance().get_handle_base(ptr)) {
-        if (handle->release()) {
+inline bool release_handle(void* ptr)
+{
+    if (auto* handle = HandleRegistry::instance().get_handle_base(ptr))
+    {
+        if (handle->release())
+        {
             HandleRegistry::instance().unregister_handle(ptr);
             return true;
         }
@@ -203,15 +228,18 @@ inline bool release_handle(void* ptr) {
     return false;
 }
 
-inline int32_t get_ref_count(void* ptr) {
-    if (auto* handle = HandleRegistry::instance().get_handle_base(ptr)) {
+inline int32_t get_ref_count(void* ptr)
+{
+    if (auto* handle = HandleRegistry::instance().get_handle_base(ptr))
+    {
         return handle->get_ref_count();
     }
     return 0;
 }
 
 // Canonical entry point for all node-producing call sites.
-inline void* get_or_create_node_handle(flow::SharedNode node) {
+inline void* get_or_create_node_handle(flow::SharedNode node)
+{
     return HandleRegistry::instance().get_or_create_node_handle(std::move(node));
 }
 

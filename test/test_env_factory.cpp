@@ -8,20 +8,24 @@
 #include "handle_manager.hpp"
 #include <gtest/gtest.h>
 
-class EnvFactoryTest : public ::testing::Test {
-protected:
-    void SetUp() override {
+class EnvFactoryTest : public ::testing::Test
+{
+  protected:
+    void SetUp() override
+    {
         flow_ffi::HandleRegistry::instance().clear();
         flow_clear_error();
     }
 
-    void TearDown() override {
+    void TearDown() override
+    {
         flow_ffi::HandleRegistry::instance().clear();
         flow_clear_error();
     }
 };
 
-TEST_F(EnvFactoryTest, CreateEnvironment) {
+TEST_F(EnvFactoryTest, CreateEnvironment)
+{
     // Create environment with 4 threads
     FlowEnvHandle env = flow_env_create(4);
     ASSERT_NE(env, nullptr);
@@ -35,7 +39,8 @@ TEST_F(EnvFactoryTest, CreateEnvironment) {
     flow_env_destroy(env);
 }
 
-TEST_F(EnvFactoryTest, CreateEnvironmentInvalidThreads) {
+TEST_F(EnvFactoryTest, CreateEnvironmentInvalidThreads)
+{
     // Try to create environment with invalid thread count
     FlowEnvHandle env = flow_env_create(0);
     EXPECT_EQ(env, nullptr);
@@ -55,7 +60,8 @@ TEST_F(EnvFactoryTest, CreateEnvironmentInvalidThreads) {
     EXPECT_TRUE(strstr(error_msg, "max_threads must be positive") != nullptr);
 }
 
-TEST_F(EnvFactoryTest, GetFactory) {
+TEST_F(EnvFactoryTest, GetFactory)
+{
     // Create environment
     FlowEnvHandle env = flow_env_create(2);
     ASSERT_NE(env, nullptr);
@@ -74,7 +80,8 @@ TEST_F(EnvFactoryTest, GetFactory) {
     flow_env_destroy(env);
 }
 
-TEST_F(EnvFactoryTest, GetFactoryInvalidHandle) {
+TEST_F(EnvFactoryTest, GetFactoryInvalidHandle)
+{
     // Try to get factory from invalid handle
     FlowNodeFactoryHandle factory = flow_env_get_factory(nullptr);
     EXPECT_EQ(factory, nullptr);
@@ -84,7 +91,8 @@ TEST_F(EnvFactoryTest, GetFactoryInvalidHandle) {
     EXPECT_TRUE(strstr(error_msg, "Invalid handle") != nullptr);
 }
 
-TEST_F(EnvFactoryTest, WaitForTasks) {
+TEST_F(EnvFactoryTest, WaitForTasks)
+{
     // Create environment
     FlowEnvHandle env = flow_env_create(2);
     ASSERT_NE(env, nullptr);
@@ -98,7 +106,8 @@ TEST_F(EnvFactoryTest, WaitForTasks) {
     flow_env_destroy(env);
 }
 
-TEST_F(EnvFactoryTest, WaitInvalidHandle) {
+TEST_F(EnvFactoryTest, WaitInvalidHandle)
+{
     FlowError result = flow_env_wait(nullptr);
     EXPECT_EQ(result, FLOW_ERROR_INVALID_HANDLE);
 
@@ -107,7 +116,8 @@ TEST_F(EnvFactoryTest, WaitInvalidHandle) {
     EXPECT_TRUE(strstr(error_msg, "Invalid handle") != nullptr);
 }
 
-TEST_F(EnvFactoryTest, GetEnvironmentVariable) {
+TEST_F(EnvFactoryTest, GetEnvironmentVariable)
+{
     // Create environment
     FlowEnvHandle env = flow_env_create(2);
     ASSERT_NE(env, nullptr);
@@ -116,7 +126,8 @@ TEST_F(EnvFactoryTest, GetEnvironmentVariable) {
     const char* path_var = flow_env_get_var(env, "PATH");
 
     // PATH should exist on most systems, but if not, it's not an error
-    if (path_var) {
+    if (path_var)
+    {
         EXPECT_NE(strlen(path_var), 0);
         flow_free_string(const_cast<char*>(path_var));
     }
@@ -127,7 +138,8 @@ TEST_F(EnvFactoryTest, GetEnvironmentVariable) {
     flow_env_destroy(env);
 }
 
-TEST_F(EnvFactoryTest, GetEnvironmentVariableInvalid) {
+TEST_F(EnvFactoryTest, GetEnvironmentVariableInvalid)
+{
     // Create environment
     FlowEnvHandle env = flow_env_create(2);
     ASSERT_NE(env, nullptr);
@@ -154,7 +166,8 @@ TEST_F(EnvFactoryTest, GetEnvironmentVariableInvalid) {
     flow_env_destroy(env);
 }
 
-TEST_F(EnvFactoryTest, GetCategories) {
+TEST_F(EnvFactoryTest, GetCategories)
+{
     // Create environment and factory
     FlowEnvHandle env = flow_env_create(2);
     ASSERT_NE(env, nullptr);
@@ -165,7 +178,7 @@ TEST_F(EnvFactoryTest, GetCategories) {
     // A fresh factory carries the P10 built-ins ("Editor" category for
     // PreviewNode).  External modules / .flowmod loads will add more.
     char** categories = nullptr;
-    size_t count = 0;
+    size_t count      = 0;
 
     FlowError result = flow_factory_get_categories(factory, &categories, &count);
     EXPECT_EQ(result, FLOW_SUCCESS);
@@ -173,8 +186,10 @@ TEST_F(EnvFactoryTest, GetCategories) {
     ASSERT_NE(categories, nullptr);
 
     bool found_editor = false;
-    for (size_t i = 0; i < count; ++i) {
-        if (categories[i] && std::string(categories[i]) == "Editor") {
+    for (size_t i = 0; i < count; ++i)
+    {
+        if (categories[i] && std::string(categories[i]) == "Editor")
+        {
             found_editor = true;
         }
     }
@@ -186,7 +201,8 @@ TEST_F(EnvFactoryTest, GetCategories) {
     flow_env_destroy(env);
 }
 
-TEST_F(EnvFactoryTest, GetCategoriesInvalidArgs) {
+TEST_F(EnvFactoryTest, GetCategoriesInvalidArgs)
+{
     // Create environment and factory
     FlowEnvHandle env = flow_env_create(2);
     ASSERT_NE(env, nullptr);
@@ -196,7 +212,7 @@ TEST_F(EnvFactoryTest, GetCategoriesInvalidArgs) {
 
     // Try with null arguments
     char** categories = nullptr;
-    size_t count = 0;
+    size_t count      = 0;
 
     FlowError result = flow_factory_get_categories(nullptr, &categories, &count);
     EXPECT_EQ(result, FLOW_ERROR_INVALID_HANDLE);
@@ -212,7 +228,8 @@ TEST_F(EnvFactoryTest, GetCategoriesInvalidArgs) {
     flow_env_destroy(env);
 }
 
-TEST_F(EnvFactoryTest, GetNodeClasses) {
+TEST_F(EnvFactoryTest, GetNodeClasses)
+{
     // Create environment and factory
     FlowEnvHandle env = flow_env_create(2);
     ASSERT_NE(env, nullptr);
@@ -222,7 +239,7 @@ TEST_F(EnvFactoryTest, GetNodeClasses) {
 
     // Get node classes for non-existent category
     char** classes = nullptr;
-    size_t count = 0;
+    size_t count   = 0;
 
     FlowError result = flow_factory_get_node_classes(factory, "NonExistent", &classes, &count);
     EXPECT_EQ(result, FLOW_SUCCESS);
@@ -234,7 +251,8 @@ TEST_F(EnvFactoryTest, GetNodeClasses) {
     flow_env_destroy(env);
 }
 
-TEST_F(EnvFactoryTest, GetFriendlyName) {
+TEST_F(EnvFactoryTest, GetFriendlyName)
+{
     // Create environment and factory
     FlowEnvHandle env = flow_env_create(2);
     ASSERT_NE(env, nullptr);
@@ -244,7 +262,8 @@ TEST_F(EnvFactoryTest, GetFriendlyName) {
 
     // Get friendly name for non-existent class (should return empty or class name)
     const char* name = flow_factory_get_friendly_name(factory, "NonExistentNode");
-    if (name) {
+    if (name)
+    {
         // If a name is returned, it should be valid
         EXPECT_GE(strlen(name), 0);
         flow_free_string(const_cast<char*>(name));
@@ -255,7 +274,8 @@ TEST_F(EnvFactoryTest, GetFriendlyName) {
     flow_env_destroy(env);
 }
 
-TEST_F(EnvFactoryTest, IsConvertible) {
+TEST_F(EnvFactoryTest, IsConvertible)
+{
     // Create environment and factory
     FlowEnvHandle env = flow_env_create(2);
     ASSERT_NE(env, nullptr);
@@ -277,7 +297,8 @@ TEST_F(EnvFactoryTest, IsConvertible) {
     flow_env_destroy(env);
 }
 
-TEST_F(EnvFactoryTest, CreateNodeNoRegistrations) {
+TEST_F(EnvFactoryTest, CreateNodeNoRegistrations)
+{
     // Create environment and factory
     FlowEnvHandle env = flow_env_create(2);
     ASSERT_NE(env, nullptr);
@@ -286,8 +307,7 @@ TEST_F(EnvFactoryTest, CreateNodeNoRegistrations) {
     ASSERT_NE(factory, nullptr);
 
     // Try to create a node when no classes are registered
-    FlowNodeHandle node =
-        flow_factory_create_node(factory, "NonExistentNode", nullptr, "test", env);
+    FlowNodeHandle node = flow_factory_create_node(factory, "NonExistentNode", nullptr, "test", env);
     EXPECT_EQ(node, nullptr);
 
     const char* error_msg = flow_get_last_error();
@@ -299,7 +319,8 @@ TEST_F(EnvFactoryTest, CreateNodeNoRegistrations) {
     flow_env_destroy(env);
 }
 
-TEST_F(EnvFactoryTest, HandleReferenceCountingMultipleFactories) {
+TEST_F(EnvFactoryTest, HandleReferenceCountingMultipleFactories)
+{
     // Create environment
     FlowEnvHandle env = flow_env_create(2);
     ASSERT_NE(env, nullptr);

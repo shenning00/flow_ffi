@@ -3,23 +3,28 @@
 #include "handle_manager.hpp"
 #include <gtest/gtest.h>
 
-class HandleManagerTest : public ::testing::Test {
-protected:
-    void SetUp() override {
+class HandleManagerTest : public ::testing::Test
+{
+  protected:
+    void SetUp() override
+    {
         // Clear any existing handles before each test
         flow_ffi::HandleRegistry::instance().clear();
         flow_clear_error();
     }
 
-    void TearDown() override {
+    void TearDown() override
+    {
         // Clean up after each test
         flow_ffi::HandleRegistry::instance().clear();
     }
 };
 
-TEST_F(HandleManagerTest, CreateAndValidateHandle) {
+TEST_F(HandleManagerTest, CreateAndValidateHandle)
+{
     // Create a simple test object
-    struct TestObject {
+    struct TestObject
+    {
         int value = 42;
     };
 
@@ -52,7 +57,8 @@ TEST_F(HandleManagerTest, CreateAndValidateHandle) {
     EXPECT_FALSE(flow_is_valid_handle(handle));
 }
 
-TEST_F(HandleManagerTest, InvalidHandleOperations) {
+TEST_F(HandleManagerTest, InvalidHandleOperations)
+{
     // Test null pointer
     EXPECT_FALSE(flow_is_valid_handle(nullptr));
     EXPECT_EQ(flow_get_ref_count(nullptr), 0);
@@ -69,11 +75,14 @@ TEST_F(HandleManagerTest, InvalidHandleOperations) {
     flow_release_handle(invalid_ptr);
 }
 
-TEST_F(HandleManagerTest, TypeSafety) {
-    struct TypeA {
+TEST_F(HandleManagerTest, TypeSafety)
+{
+    struct TypeA
+    {
         int a = 1;
     };
-    struct TypeB {
+    struct TypeB
+    {
         int b = 2;
     };
 
@@ -105,8 +114,10 @@ TEST_F(HandleManagerTest, TypeSafety) {
     flow_release_handle(handle_b);
 }
 
-TEST_F(HandleManagerTest, MultipleReferences) {
-    struct TestObject {
+TEST_F(HandleManagerTest, MultipleReferences)
+{
+    struct TestObject
+    {
         int value = 100;
     };
 
@@ -117,13 +128,15 @@ TEST_F(HandleManagerTest, MultipleReferences) {
     EXPECT_EQ(flow_get_ref_count(handle), 1);
 
     // Add multiple references
-    for (int i = 0; i < 5; ++i) {
+    for (int i = 0; i < 5; ++i)
+    {
         flow_retain_handle(handle);
         EXPECT_EQ(flow_get_ref_count(handle), 2 + i);
     }
 
     // Release references one by one
-    for (int i = 4; i >= 0; --i) {
+    for (int i = 4; i >= 0; --i)
+    {
         EXPECT_TRUE(flow_is_valid_handle(handle));
         flow_release_handle(handle);
         EXPECT_EQ(flow_get_ref_count(handle), 1 + i);
@@ -138,8 +151,10 @@ TEST_F(HandleManagerTest, MultipleReferences) {
     EXPECT_FALSE(flow_is_valid_handle(handle));
 }
 
-TEST_F(HandleManagerTest, HandleRegistry) {
-    struct TestObject {
+TEST_F(HandleManagerTest, HandleRegistry)
+{
+    struct TestObject
+    {
         int id;
     };
 
@@ -148,7 +163,8 @@ TEST_F(HandleManagerTest, HandleRegistry) {
 
     // Create multiple handles
     std::vector<void*> handles;
-    for (int i = 0; i < 10; ++i) {
+    for (int i = 0; i < 10; ++i)
+    {
         auto* handle = flow_ffi::create_handle<TestObject>(TestObject{i});
         handles.push_back(handle);
     }
@@ -157,12 +173,14 @@ TEST_F(HandleManagerTest, HandleRegistry) {
     EXPECT_EQ(flow_ffi::HandleRegistry::instance().get_handle_count(), 10);
 
     // Verify all handles are valid
-    for (auto* handle : handles) {
+    for (auto* handle : handles)
+    {
         EXPECT_TRUE(flow_is_valid_handle(handle));
     }
 
     // Release all handles
-    for (auto* handle : handles) {
+    for (auto* handle : handles)
+    {
         flow_release_handle(handle);
     }
 

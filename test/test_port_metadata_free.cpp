@@ -3,17 +3,19 @@
 #include <gtest/gtest.h>
 
 // Test the new flow_free_port_metadata function
-TEST(PortMetadataFreeTest, FreePortMetadataWithNullPointer) {
+TEST(PortMetadataFreeTest, FreePortMetadataWithNullPointer)
+{
     // Should not crash with null pointer
     flow_free_port_metadata(nullptr);
 }
 
-TEST(PortMetadataFreeTest, FreePortMetadataWithValidData) {
+TEST(PortMetadataFreeTest, FreePortMetadataWithValidData)
+{
     // Create a metadata structure on the stack
     FlowPortMetadata metadata;
 
     // Simulate allocated strings (as done by the API)
-    const char* key_str = "test_port";
+    const char* key_str  = "test_port";
     const char* json_str = R"({"type":"integer","value":"42"})";
 
     metadata.key = new char[strlen(key_str) + 1];
@@ -32,16 +34,17 @@ TEST(PortMetadataFreeTest, FreePortMetadataWithValidData) {
     EXPECT_EQ(metadata.interworking_value_json, nullptr);
 }
 
-TEST(PortMetadataFreeTest, FreePortMetadataWithPartialData) {
+TEST(PortMetadataFreeTest, FreePortMetadataWithPartialData)
+{
     FlowPortMetadata metadata;
 
     // Only allocate one field
     const char* key_str = "test_port";
-    metadata.key = new char[strlen(key_str) + 1];
+    metadata.key        = new char[strlen(key_str) + 1];
     strcpy(const_cast<char*>(metadata.key), key_str);
 
     metadata.interworking_value_json = nullptr;
-    metadata.has_default = false;
+    metadata.has_default             = false;
 
     // Should handle partial data gracefully
     flow_free_port_metadata(&metadata);
@@ -50,13 +53,14 @@ TEST(PortMetadataFreeTest, FreePortMetadataWithPartialData) {
     EXPECT_EQ(metadata.interworking_value_json, nullptr);
 }
 
-TEST(PortMetadataFreeTest, ConsistencyWithArrayFreeFunction) {
+TEST(PortMetadataFreeTest, ConsistencyWithArrayFreeFunction)
+{
     // This test verifies that the single free function and array free function
     // behave consistently
 
     // Create a single metadata item
     FlowPortMetadata single_metadata;
-    const char* key1 = "port1";
+    const char* key1  = "port1";
     const char* json1 = R"({"type":"string","value":"test"})";
 
     single_metadata.key = new char[strlen(key1) + 1];
@@ -69,8 +73,8 @@ TEST(PortMetadataFreeTest, ConsistencyWithArrayFreeFunction) {
 
     // Create an array with one item
     FlowPortMetadata* metadata_array = new FlowPortMetadata[1];
-    const char* key2 = "port2";
-    const char* json2 = R"({"type":"integer","value":"100"})";
+    const char* key2                 = "port2";
+    const char* json2                = R"({"type":"integer","value":"100"})";
 
     metadata_array[0].key = new char[strlen(key2) + 1];
     strcpy(const_cast<char*>(metadata_array[0].key), key2);

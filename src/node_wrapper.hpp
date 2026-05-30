@@ -17,7 +17,8 @@
 
 using flow::SharedNode;
 
-struct NodeWrapper {
+struct NodeWrapper
+{
     SharedNode node;
     NodeWrapper(SharedNode n) : node(std::move(n)) {}
 };

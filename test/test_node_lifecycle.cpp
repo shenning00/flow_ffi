@@ -28,12 +28,12 @@
 // Minimal concrete Node subclass used as the "default" / no-op case.
 // Start() and Stop() are inherited as empty virtuals from flow::Node.
 // ---------------------------------------------------------------------------
-class DefaultNode : public flow::Node {
-public:
-    DefaultNode()
-        : flow::Node(flow::UUID(), "DefaultNode", "default", nullptr) {}
+class DefaultNode : public flow::Node
+{
+  public:
+    DefaultNode() : flow::Node(flow::UUID(), "DefaultNode", "default", nullptr) {}
 
-protected:
+  protected:
     void Compute() override {}
 };
 
@@ -41,18 +41,18 @@ protected:
 // Flag-flipping node: verifies that Start()/Stop() actually reach the node
 // instance via the FFI surface (not just that the FFI symbol returns SUCCESS).
 // ---------------------------------------------------------------------------
-class FlagNode : public flow::Node {
-public:
-    FlagNode()
-        : flow::Node(flow::UUID(), "FlagNode", "flag", nullptr) {}
+class FlagNode : public flow::Node
+{
+  public:
+    FlagNode() : flow::Node(flow::UUID(), "FlagNode", "flag", nullptr) {}
 
     bool started = false;
     bool stopped = false;
 
     void Start() override { started = true; }
-    void Stop()  override { stopped = true; }
+    void Stop() override { stopped = true; }
 
-protected:
+  protected:
     void Compute() override {}
 };
 
@@ -61,28 +61,31 @@ protected:
 // FFI try/catch wrapper catches and reports via the ErrorManager rather than
 // letting the exception cross the C boundary.
 // ---------------------------------------------------------------------------
-class ThrowingNode : public flow::Node {
-public:
-    ThrowingNode()
-        : flow::Node(flow::UUID(), "ThrowingNode", "throw", nullptr) {}
+class ThrowingNode : public flow::Node
+{
+  public:
+    ThrowingNode() : flow::Node(flow::UUID(), "ThrowingNode", "throw", nullptr) {}
 
     void Start() override { throw std::runtime_error("Start boom"); }
-    void Stop()  override { throw std::runtime_error("Stop boom"); }
+    void Stop() override { throw std::runtime_error("Stop boom"); }
 
-protected:
+  protected:
     void Compute() override {}
 };
 
 // ---------------------------------------------------------------------------
 // Fixture: isolated handle registry + cleared error state per test.
 // ---------------------------------------------------------------------------
-class NodeLifecycleTest : public ::testing::Test {
-protected:
-    void SetUp() override {
+class NodeLifecycleTest : public ::testing::Test
+{
+  protected:
+    void SetUp() override
+    {
         flow_ffi::HandleRegistry::instance().clear();
         flow_clear_error();
     }
-    void TearDown() override {
+    void TearDown() override
+    {
         flow_ffi::HandleRegistry::instance().clear();
         flow_clear_error();
     }
@@ -91,18 +94,21 @@ protected:
 // ---------------------------------------------------------------------------
 // (1) Invalid handle returns FLOW_ERROR_INVALID_HANDLE.
 // ---------------------------------------------------------------------------
-TEST_F(NodeLifecycleTest, NodeStart_InvalidHandle_ReturnsInvalidHandle) {
+TEST_F(NodeLifecycleTest, NodeStart_InvalidHandle_ReturnsInvalidHandle)
+{
     EXPECT_EQ(flow_node_start(nullptr), FLOW_ERROR_INVALID_HANDLE);
 }
 
-TEST_F(NodeLifecycleTest, NodeStop_InvalidHandle_ReturnsInvalidHandle) {
+TEST_F(NodeLifecycleTest, NodeStop_InvalidHandle_ReturnsInvalidHandle)
+{
     EXPECT_EQ(flow_node_stop(nullptr), FLOW_ERROR_INVALID_HANDLE);
 }
 
 // ---------------------------------------------------------------------------
 // (2) Default no-op Start()/Stop() return FLOW_SUCCESS.
 // ---------------------------------------------------------------------------
-TEST_F(NodeLifecycleTest, NodeStart_DefaultNoopImpl_ReturnsSuccess) {
+TEST_F(NodeLifecycleTest, NodeStart_DefaultNoopImpl_ReturnsSuccess)
+{
     auto node = std::make_shared<DefaultNode>();
     void* raw = flow_ffi::get_or_create_node_handle(node);
     ASSERT_NE(raw, nullptr);
@@ -113,7 +119,8 @@ TEST_F(NodeLifecycleTest, NodeStart_DefaultNoopImpl_ReturnsSuccess) {
     flow_release_handle(handle);
 }
 
-TEST_F(NodeLifecycleTest, NodeStop_DefaultNoopImpl_ReturnsSuccess) {
+TEST_F(NodeLifecycleTest, NodeStop_DefaultNoopImpl_ReturnsSuccess)
+{
     auto node = std::make_shared<DefaultNode>();
     void* raw = flow_ffi::get_or_create_node_handle(node);
     ASSERT_NE(raw, nullptr);
@@ -127,7 +134,8 @@ TEST_F(NodeLifecycleTest, NodeStop_DefaultNoopImpl_ReturnsSuccess) {
 // ---------------------------------------------------------------------------
 // (3) Double-call is safe — start; start; stop; stop; all return SUCCESS.
 // ---------------------------------------------------------------------------
-TEST_F(NodeLifecycleTest, NodeStartStop_DoubleCallIsSafe) {
+TEST_F(NodeLifecycleTest, NodeStartStop_DoubleCallIsSafe)
+{
     auto node = std::make_shared<DefaultNode>();
     void* raw = flow_ffi::get_or_create_node_handle(node);
     ASSERT_NE(raw, nullptr);
@@ -135,8 +143,8 @@ TEST_F(NodeLifecycleTest, NodeStartStop_DoubleCallIsSafe) {
 
     EXPECT_EQ(flow_node_start(handle), FLOW_SUCCESS);
     EXPECT_EQ(flow_node_start(handle), FLOW_SUCCESS);
-    EXPECT_EQ(flow_node_stop(handle),  FLOW_SUCCESS);
-    EXPECT_EQ(flow_node_stop(handle),  FLOW_SUCCESS);
+    EXPECT_EQ(flow_node_stop(handle), FLOW_SUCCESS);
+    EXPECT_EQ(flow_node_stop(handle), FLOW_SUCCESS);
 
     flow_release_handle(handle);
 }
@@ -144,7 +152,8 @@ TEST_F(NodeLifecycleTest, NodeStartStop_DoubleCallIsSafe) {
 // ---------------------------------------------------------------------------
 // (4) Calls actually reach the node — flag flips on FlagNode.
 // ---------------------------------------------------------------------------
-TEST_F(NodeLifecycleTest, NodeStart_FlagNode_FlipsStartedFlag) {
+TEST_F(NodeLifecycleTest, NodeStart_FlagNode_FlipsStartedFlag)
+{
     auto node = std::make_shared<FlagNode>();
     void* raw = flow_ffi::get_or_create_node_handle(node);
     ASSERT_NE(raw, nullptr);
@@ -165,7 +174,8 @@ TEST_F(NodeLifecycleTest, NodeStart_FlagNode_FlipsStartedFlag) {
 // (5) Throwing override → FLOW_ERROR_UNKNOWN, error manager populated, no
 //     exception escapes the FFI boundary.
 // ---------------------------------------------------------------------------
-TEST_F(NodeLifecycleTest, NodeStart_ThrowingImpl_ReturnsUnknownAndSetsError) {
+TEST_F(NodeLifecycleTest, NodeStart_ThrowingImpl_ReturnsUnknownAndSetsError)
+{
     auto node = std::make_shared<ThrowingNode>();
     void* raw = flow_ffi::get_or_create_node_handle(node);
     ASSERT_NE(raw, nullptr);
@@ -181,7 +191,8 @@ TEST_F(NodeLifecycleTest, NodeStart_ThrowingImpl_ReturnsUnknownAndSetsError) {
     flow_release_handle(handle);
 }
 
-TEST_F(NodeLifecycleTest, NodeStop_ThrowingImpl_ReturnsUnknownAndSetsError) {
+TEST_F(NodeLifecycleTest, NodeStop_ThrowingImpl_ReturnsUnknownAndSetsError)
+{
     auto node = std::make_shared<ThrowingNode>();
     void* raw = flow_ffi::get_or_create_node_handle(node);
     ASSERT_NE(raw, nullptr);

@@ -17,33 +17,36 @@
 // emits a flow::Image (kind=Encoded); Skia decodes on the Dart side, so
 // the test does not require a real codec — any non-empty file round-trips.
 
-namespace {
+namespace
+{
 
 // Helper: write `bytes` to a unique temp file; returns the absolute path.
 // Caller is responsible for std::remove() on the returned path.
-std::string write_temp_file(const std::vector<uint8_t>& bytes,
-                            const std::string& suffix = ".bin") {
+std::string write_temp_file(const std::vector<uint8_t>& bytes, const std::string& suffix = ".bin")
+{
     // mkstemps style isn't portable; tmpnam is deprecated.  Use the
     // POSIX-ish pattern of /tmp + pid + counter, which is more than
     // unique enough for a single-process test run.
     static int counter = 0;
     char buf[256];
-    std::snprintf(buf, sizeof(buf), "/tmp/flow_ffi_image_open_test_%d_%d%s",
-                  static_cast<int>(::getpid()), counter++, suffix.c_str());
+    std::snprintf(buf, sizeof(buf), "/tmp/flow_ffi_image_open_test_%d_%d%s", static_cast<int>(::getpid()), counter++,
+                  suffix.c_str());
     std::ofstream f(buf, std::ios::binary);
-    if (bytes.empty()) {
+    if (bytes.empty())
+    {
         // touch the file so it exists but is empty
         f.close();
         return buf;
     }
-    f.write(reinterpret_cast<const char*>(bytes.data()),
-            static_cast<std::streamsize>(bytes.size()));
+    f.write(reinterpret_cast<const char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
     return buf;
 }
 
-class ImageOpenNodeTest : public ::testing::Test {
+class ImageOpenNodeTest : public ::testing::Test
+{
   protected:
-    void SetUp() override {
+    void SetUp() override
+    {
         flow_clear_error();
         env_ = flow_env_create(2);
         ASSERT_NE(env_, nullptr);
@@ -53,49 +56,56 @@ class ImageOpenNodeTest : public ::testing::Test {
         ASSERT_NE(graph_, nullptr);
     }
 
-    void TearDown() override {
-        if (graph_) {
+    void TearDown() override
+    {
+        if (graph_)
+        {
             flow_graph_destroy(graph_);
             graph_ = nullptr;
         }
-        if (factory_) {
+        if (factory_)
+        {
             flow_release_handle(factory_);
             factory_ = nullptr;
         }
-        if (env_) {
+        if (env_)
+        {
             flow_env_destroy(env_);
             env_ = nullptr;
         }
         flow_clear_error();
     }
 
-    FlowEnvHandle env_ = nullptr;
+    FlowEnvHandle env_             = nullptr;
     FlowNodeFactoryHandle factory_ = nullptr;
-    FlowGraphHandle graph_ = nullptr;
+    FlowGraphHandle graph_         = nullptr;
 };
 
 // (1) Factory registration: Editor category contains an ImageOpen class.
-TEST_F(ImageOpenNodeTest, IsRegistered) {
-    char** classes = nullptr;
+TEST_F(ImageOpenNodeTest, IsRegistered)
+{
+    char** classes    = nullptr;
     std::size_t count = 0;
-    ASSERT_EQ(flow_factory_get_node_classes(factory_, "Editor", &classes, &count),
-              FLOW_SUCCESS);
+    ASSERT_EQ(flow_factory_get_node_classes(factory_, "Editor", &classes, &count), FLOW_SUCCESS);
     ASSERT_GT(count, 0u);
 
     bool found = false;
     std::string image_open_class;
-    for (std::size_t i = 0; i < count; ++i) {
+    for (std::size_t i = 0; i < count; ++i)
+    {
         ASSERT_NE(classes[i], nullptr);
         std::string name = classes[i];
-        if (name.find("ImageOpenNode") != std::string::npos) {
-            found = true;
+        if (name.find("ImageOpenNode") != std::string::npos)
+        {
+            found            = true;
             image_open_class = name;
         }
     }
     flow_free_string_array(classes, count);
 
     EXPECT_TRUE(found) << "Expected an Editor.* class containing 'ImageOpenNode'";
-    if (found) {
+    if (found)
+    {
         const char* friendly = flow_factory_get_friendly_name(factory_, image_open_class.c_str());
         ASSERT_NE(friendly, nullptr);
         EXPECT_STREQ(friendly, "ImageOpen");
@@ -104,19 +114,20 @@ TEST_F(ImageOpenNodeTest, IsRegistered) {
 
 // (2) Compute reads a real file and emits an Encoded flow::Image whose
 //     bytes match the file content.
-TEST_F(ImageOpenNodeTest, ComputeEmitsEncodedImageWithFileBytes) {
-    const std::vector<uint8_t> payload = {0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,
-                                          'h',  'e',  'l',  'l',  'o'};
-    const std::string path = write_temp_file(payload, ".png");
+TEST_F(ImageOpenNodeTest, ComputeEmitsEncodedImageWithFileBytes)
+{
+    const std::vector<uint8_t> payload = {0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 'h', 'e', 'l', 'l', 'o'};
+    const std::string path             = write_temp_file(payload, ".png");
 
     // Find the registered ImageOpen class name (carries the C++ namespace).
-    char** classes = nullptr;
+    char** classes    = nullptr;
     std::size_t count = 0;
-    ASSERT_EQ(flow_factory_get_node_classes(factory_, "Editor", &classes, &count),
-              FLOW_SUCCESS);
+    ASSERT_EQ(flow_factory_get_node_classes(factory_, "Editor", &classes, &count), FLOW_SUCCESS);
     std::string image_open_class;
-    for (std::size_t i = 0; i < count; ++i) {
-        if (std::string(classes[i]).find("ImageOpenNode") != std::string::npos) {
+    for (std::size_t i = 0; i < count; ++i)
+    {
+        if (std::string(classes[i]).find("ImageOpenNode") != std::string::npos)
+        {
             image_open_class = classes[i];
         }
     }
@@ -148,14 +159,16 @@ TEST_F(ImageOpenNodeTest, ComputeEmitsEncodedImageWithFileBytes) {
 }
 
 // (3) Empty path string: Compute is a no-op (no output set, no crash).
-TEST_F(ImageOpenNodeTest, EmptyPathIsHandled) {
-    char** classes = nullptr;
+TEST_F(ImageOpenNodeTest, EmptyPathIsHandled)
+{
+    char** classes    = nullptr;
     std::size_t count = 0;
-    ASSERT_EQ(flow_factory_get_node_classes(factory_, "Editor", &classes, &count),
-              FLOW_SUCCESS);
+    ASSERT_EQ(flow_factory_get_node_classes(factory_, "Editor", &classes, &count), FLOW_SUCCESS);
     std::string image_open_class;
-    for (std::size_t i = 0; i < count; ++i) {
-        if (std::string(classes[i]).find("ImageOpenNode") != std::string::npos) {
+    for (std::size_t i = 0; i < count; ++i)
+    {
+        if (std::string(classes[i]).find("ImageOpenNode") != std::string::npos)
+        {
             image_open_class = classes[i];
         }
     }
@@ -180,14 +193,16 @@ TEST_F(ImageOpenNodeTest, EmptyPathIsHandled) {
 
 // (4) Missing file: Compute raises through the framework; no output set,
 //     no crash.  We verify by reading the output port — it must be null.
-TEST_F(ImageOpenNodeTest, MissingFileFailsCleanly) {
-    char** classes = nullptr;
+TEST_F(ImageOpenNodeTest, MissingFileFailsCleanly)
+{
+    char** classes    = nullptr;
     std::size_t count = 0;
-    ASSERT_EQ(flow_factory_get_node_classes(factory_, "Editor", &classes, &count),
-              FLOW_SUCCESS);
+    ASSERT_EQ(flow_factory_get_node_classes(factory_, "Editor", &classes, &count), FLOW_SUCCESS);
     std::string image_open_class;
-    for (std::size_t i = 0; i < count; ++i) {
-        if (std::string(classes[i]).find("ImageOpenNode") != std::string::npos) {
+    for (std::size_t i = 0; i < count; ++i)
+    {
+        if (std::string(classes[i]).find("ImageOpenNode") != std::string::npos)
+        {
             image_open_class = classes[i];
         }
     }

@@ -37,8 +37,8 @@
 // the most recently "created" texture, allowing tests to verify the
 // create/destroy/mark_frame lifecycle without a real Flutter engine.
 
-#include "flow_ffi_cuda.h"
 #include "flow_ffi.h"
+#include "flow_ffi_cuda.h"
 
 #include <gtest/gtest.h>
 
@@ -51,9 +51,9 @@
 // own GL types and sets include guards that prevent the system GL/gl.h from
 // being re-included by cuda_gl_interop.h, avoiding KHRONOS_* redefinition
 // conflicts.
-#include <epoxy/gl.h>
-#include <epoxy/egl.h>
 #include <cuda_runtime.h>
+#include <epoxy/egl.h>
+#include <epoxy/gl.h>
 // cuda_gl_interop.h includes GL/gl.h only if not already guarded; with epoxy
 // loaded first the system GL headers are suppressed.
 #include <cuda_gl_interop.h>
@@ -64,49 +64,48 @@
 // Mock texture ops
 // ---------------------------------------------------------------------------
 
-namespace {
+namespace
+{
 
-struct MockTextureState {
-    void*    texture_object{nullptr};
-    int64_t  texture_id{0};
+struct MockTextureState
+{
+    void* texture_object{nullptr};
+    int64_t texture_id{0};
     uint32_t gl_name{0};
-    int      destroy_call_count{0};
-    int      mark_frame_count{0};
+    int destroy_call_count{0};
+    int mark_frame_count{0};
 };
 
 // A global sentinel non-null registrar pointer — value doesn't matter in
 // mock tests because our callbacks never dereference it.
 // Cannot use reinterpret_cast in constexpr context; use a static variable.
-static int             s_mock_registrar_sentinel = 0;
-static void* const     kMockRegistrar = &s_mock_registrar_sentinel;
+static int s_mock_registrar_sentinel = 0;
+static void* const kMockRegistrar    = &s_mock_registrar_sentinel;
 
 static MockTextureState g_mock_state;
 static std::atomic<int> g_create_call_count{0};
 static std::atomic<int> g_submit_frame_count{0};
-static bool             g_create_should_fail{false};
+static bool g_create_should_fail{false};
 
 // Reset mock state between tests.
-static void reset_mock() {
+static void reset_mock()
+{
     g_mock_state = MockTextureState{};
     g_create_call_count.store(0);
     g_submit_frame_count.store(0);
     g_create_should_fail = false;
-    flow_ffi_set_texture_ops(nullptr);   // clear ops
+    flow_ffi_set_texture_ops(nullptr); // clear ops
     flow_ffi_set_texture_registrar(nullptr);
 }
 
-static int mock_create_gl_texture(void*    /*registrar*/,
-                                   int32_t  width,
-                                   int32_t  height,
-                                   void**   out_texture_object,
-                                   int64_t* out_texture_id,
-                                   uint32_t* out_gl_name)
+static int mock_create_gl_texture(void* /*registrar*/, int32_t width, int32_t height, void** out_texture_object,
+                                  int64_t* out_texture_id, uint32_t* out_gl_name)
 {
     ++g_create_call_count;
     if (g_create_should_fail) return -1;
 
     // Synthesise a fake texture object and IDs — just use static addresses.
-    g_mock_state.texture_object = &g_mock_state;    // non-null sentinel
+    g_mock_state.texture_object = &g_mock_state; // non-null sentinel
     g_mock_state.texture_id     = 42LL + g_create_call_count.load();
     g_mock_state.gl_name        = static_cast<uint32_t>(width * height);
 
@@ -116,15 +115,12 @@ static int mock_create_gl_texture(void*    /*registrar*/,
     return 0;
 }
 
-static void mock_destroy_gl_texture(void*   /*registrar*/,
-                                     void*   /*texture_object*/,
-                                     int64_t /*texture_id*/)
+static void mock_destroy_gl_texture(void* /*registrar*/, void* /*texture_object*/, int64_t /*texture_id*/)
 {
     ++g_mock_state.destroy_call_count;
 }
 
-static void mock_mark_frame_available(void* /*registrar*/,
-                                       void* /*texture_object*/)
+static void mock_mark_frame_available(void* /*registrar*/, void* /*texture_object*/)
 {
     ++g_mock_state.mark_frame_count;
 }
@@ -134,39 +130,33 @@ static void mock_mark_frame_available(void* /*registrar*/,
 // cudaGraphicsMapResources will fail on it in headless tests (which is fine).
 static int s_fake_cuda_res_sentinel = 0;
 
-static int mock_wait_initialized(void* /*texture_object*/,
-                                  void** out_cuda_resource)
+static int mock_wait_initialized(void* /*texture_object*/, void** out_cuda_resource)
 {
     // Immediately signal success with a fake (non-null) resource handle.
     // cudaGraphicsMapResources will fail with this fake handle in headless
     // environments, which matches the expected headless test path.
-    if (out_cuda_resource) {
+    if (out_cuda_resource)
+    {
         *out_cuda_resource = &s_fake_cuda_res_sentinel;
     }
     return 0;
 }
 
-static int mock_submit_frame(void*       /*texture_object*/,
-                              const void* /*src_device_ptr*/,
-                              int32_t     /*src_pitch_bytes*/,
-                              int32_t     /*width*/,
-                              int32_t     /*height*/,
-                              void*       /*ready_event*/)
+static int mock_submit_frame(void* /*texture_object*/, const void* /*src_device_ptr*/, int32_t /*src_pitch_bytes*/,
+                             int32_t /*width*/, int32_t /*height*/, void* /*ready_event*/)
 {
     ++g_submit_frame_count;
     return 0;
 }
 
 static const FlowTextureOps kMockOps = {
-    mock_create_gl_texture,
-    mock_destroy_gl_texture,
-    mock_mark_frame_available,
-    mock_wait_initialized,
-    mock_submit_frame,
+    mock_create_gl_texture, mock_destroy_gl_texture, mock_mark_frame_available,
+    mock_wait_initialized,  mock_submit_frame,
 };
 
 // Bind the mock registrar and ops.
-static void bind_mock_ops() {
+static void bind_mock_ops()
+{
     flow_ffi_set_texture_registrar(kMockRegistrar);
     flow_ffi_set_texture_ops(&kMockOps);
 }
@@ -177,13 +167,16 @@ static void bind_mock_ops() {
 // Test fixture
 // ---------------------------------------------------------------------------
 
-class CudaTextureInteropTest : public ::testing::Test {
-protected:
-    void SetUp() override {
+class CudaTextureInteropTest : public ::testing::Test
+{
+  protected:
+    void SetUp() override
+    {
         flow_clear_error();
         reset_mock();
     }
-    void TearDown() override {
+    void TearDown() override
+    {
         reset_mock();
         flow_clear_error();
     }
@@ -192,13 +185,13 @@ protected:
 // ---------------------------------------------------------------------------
 // A1: Registrar not bound → FLOW_ERROR_NOT_IMPLEMENTED
 // ---------------------------------------------------------------------------
-TEST_F(CudaTextureInteropTest, RegisterFailsWhenRegistrarNotBound) {
+TEST_F(CudaTextureInteropTest, RegisterFailsWhenRegistrarNotBound)
+{
     // Neither registrar nor ops bound.
     FlowCudaTextureHandle handle = nullptr;
-    int64_t               tex_id = -1;
+    int64_t tex_id               = -1;
 
-    FlowError err = flow_ffi_register_cuda_flutter_texture(
-        64, 64, &handle, &tex_id);
+    FlowError err = flow_ffi_register_cuda_flutter_texture(64, 64, &handle, &tex_id);
 
     EXPECT_EQ(err, FLOW_ERROR_NOT_IMPLEMENTED);
     EXPECT_EQ(handle, nullptr);
@@ -208,15 +201,15 @@ TEST_F(CudaTextureInteropTest, RegisterFailsWhenRegistrarNotBound) {
 // ---------------------------------------------------------------------------
 // A2: Registrar bound but ops not bound → FLOW_ERROR_NOT_IMPLEMENTED
 // ---------------------------------------------------------------------------
-TEST_F(CudaTextureInteropTest, RegisterFailsWhenOpsNotBound) {
+TEST_F(CudaTextureInteropTest, RegisterFailsWhenOpsNotBound)
+{
     flow_ffi_set_texture_registrar(kMockRegistrar);
     // Deliberately do NOT call flow_ffi_set_texture_ops.
 
     FlowCudaTextureHandle handle = nullptr;
-    int64_t               tex_id = -1;
+    int64_t tex_id               = -1;
 
-    FlowError err = flow_ffi_register_cuda_flutter_texture(
-        64, 64, &handle, &tex_id);
+    FlowError err = flow_ffi_register_cuda_flutter_texture(64, 64, &handle, &tex_id);
 
     EXPECT_EQ(err, FLOW_ERROR_NOT_IMPLEMENTED);
     EXPECT_EQ(handle, nullptr);
@@ -226,10 +219,10 @@ TEST_F(CudaTextureInteropTest, RegisterFailsWhenOpsNotBound) {
 // ---------------------------------------------------------------------------
 // A3: Null out-params → FLOW_ERROR_INVALID_ARGUMENT (CUDA) / NOT_IMPLEMENTED (stub)
 // ---------------------------------------------------------------------------
-TEST_F(CudaTextureInteropTest, RegisterFailsOnNullOutParams) {
+TEST_F(CudaTextureInteropTest, RegisterFailsOnNullOutParams)
+{
     bind_mock_ops();
-    FlowError err = flow_ffi_register_cuda_flutter_texture(
-        64, 64, nullptr, nullptr);
+    FlowError err = flow_ffi_register_cuda_flutter_texture(64, 64, nullptr, nullptr);
 #if FLOW_FFI_HAS_CUDA
     EXPECT_EQ(err, FLOW_ERROR_INVALID_ARGUMENT);
 #else
@@ -240,15 +233,14 @@ TEST_F(CudaTextureInteropTest, RegisterFailsOnNullOutParams) {
 // ---------------------------------------------------------------------------
 // A4: Non-positive dimensions → FLOW_ERROR_INVALID_ARGUMENT (CUDA) / NOT_IMPLEMENTED (stub)
 // ---------------------------------------------------------------------------
-TEST_F(CudaTextureInteropTest, RegisterFailsOnInvalidDimensions) {
+TEST_F(CudaTextureInteropTest, RegisterFailsOnInvalidDimensions)
+{
     bind_mock_ops();
     FlowCudaTextureHandle handle = nullptr;
-    int64_t               tex_id = -1;
+    int64_t tex_id               = -1;
 
-    FlowError err0 = flow_ffi_register_cuda_flutter_texture(
-        0, 64, &handle, &tex_id);
-    FlowError err1 = flow_ffi_register_cuda_flutter_texture(
-        64, -1, &handle, &tex_id);
+    FlowError err0 = flow_ffi_register_cuda_flutter_texture(0, 64, &handle, &tex_id);
+    FlowError err1 = flow_ffi_register_cuda_flutter_texture(64, -1, &handle, &tex_id);
 #if FLOW_FFI_HAS_CUDA
     EXPECT_EQ(err0, FLOW_ERROR_INVALID_ARGUMENT);
     EXPECT_EQ(err1, FLOW_ERROR_INVALID_ARGUMENT);
@@ -262,15 +254,15 @@ TEST_F(CudaTextureInteropTest, RegisterFailsOnInvalidDimensions) {
 // A5: Mock create returns -1 → FLOW_ERROR_UNKNOWN (CUDA build only)
 // In the stub build all register calls return NOT_IMPLEMENTED.
 // ---------------------------------------------------------------------------
-TEST_F(CudaTextureInteropTest, RegisterFailsWhenCreateCallbackFails) {
+TEST_F(CudaTextureInteropTest, RegisterFailsWhenCreateCallbackFails)
+{
     bind_mock_ops();
     g_create_should_fail = true;
 
     FlowCudaTextureHandle handle = nullptr;
-    int64_t               tex_id = -1;
+    int64_t tex_id               = -1;
 
-    FlowError err = flow_ffi_register_cuda_flutter_texture(
-        64, 64, &handle, &tex_id);
+    FlowError err = flow_ffi_register_cuda_flutter_texture(64, 64, &handle, &tex_id);
 
 #if FLOW_FFI_HAS_CUDA
     EXPECT_EQ(err, FLOW_ERROR_UNKNOWN);
@@ -286,7 +278,8 @@ TEST_F(CudaTextureInteropTest, RegisterFailsWhenCreateCallbackFails) {
 // A6: Unregister with null handle.
 // CUDA build → FLOW_ERROR_INVALID_HANDLE; stub build → NOT_IMPLEMENTED.
 // ---------------------------------------------------------------------------
-TEST_F(CudaTextureInteropTest, UnregisterNullHandleReturnsError) {
+TEST_F(CudaTextureInteropTest, UnregisterNullHandleReturnsError)
+{
     FlowError err = flow_ffi_unregister_cuda_flutter_texture(nullptr);
 #if FLOW_FFI_HAS_CUDA
     EXPECT_EQ(err, FLOW_ERROR_INVALID_HANDLE);
@@ -299,10 +292,10 @@ TEST_F(CudaTextureInteropTest, UnregisterNullHandleReturnsError) {
 // A7: Unregister an unknown (stale) handle.
 // CUDA build → FLOW_ERROR_INVALID_HANDLE; stub build → NOT_IMPLEMENTED.
 // ---------------------------------------------------------------------------
-TEST_F(CudaTextureInteropTest, UnregisterUnknownHandleReturnsError) {
-    int sentinel = 0;
-    FlowError err = flow_ffi_unregister_cuda_flutter_texture(
-        static_cast<FlowCudaTextureHandle>(&sentinel));
+TEST_F(CudaTextureInteropTest, UnregisterUnknownHandleReturnsError)
+{
+    int sentinel  = 0;
+    FlowError err = flow_ffi_unregister_cuda_flutter_texture(static_cast<FlowCudaTextureHandle>(&sentinel));
 #if FLOW_FFI_HAS_CUDA
     EXPECT_EQ(err, FLOW_ERROR_INVALID_HANDLE);
 #else
@@ -314,10 +307,10 @@ TEST_F(CudaTextureInteropTest, UnregisterUnknownHandleReturnsError) {
 // A8: write_into with null handle.
 // CUDA build → FLOW_ERROR_INVALID_HANDLE; stub build → NOT_IMPLEMENTED.
 // ---------------------------------------------------------------------------
-TEST_F(CudaTextureInteropTest, WriteIntoNullHandleReturnsError) {
+TEST_F(CudaTextureInteropTest, WriteIntoNullHandleReturnsError)
+{
     int dummy_src = 0;
-    FlowError err = flow_ffi_cuda_write_into(
-        nullptr, &dummy_src, 256, 64, 64, nullptr);
+    FlowError err = flow_ffi_cuda_write_into(nullptr, &dummy_src, 256, 64, 64, nullptr);
 #if FLOW_FFI_HAS_CUDA
     EXPECT_EQ(err, FLOW_ERROR_INVALID_HANDLE);
 #else
@@ -329,12 +322,12 @@ TEST_F(CudaTextureInteropTest, WriteIntoNullHandleReturnsError) {
 // A9: write_into with unknown handle.
 // CUDA build → FLOW_ERROR_INVALID_HANDLE; stub build → NOT_IMPLEMENTED.
 // ---------------------------------------------------------------------------
-TEST_F(CudaTextureInteropTest, WriteIntoUnknownHandleReturnsError) {
-    int sentinel   = 0;
-    int dummy_src  = 0;
-    FlowError err = flow_ffi_cuda_write_into(
-        static_cast<FlowCudaTextureHandle>(&sentinel),
-        &dummy_src, 256, 64, 64, nullptr);
+TEST_F(CudaTextureInteropTest, WriteIntoUnknownHandleReturnsError)
+{
+    int sentinel  = 0;
+    int dummy_src = 0;
+    FlowError err =
+        flow_ffi_cuda_write_into(static_cast<FlowCudaTextureHandle>(&sentinel), &dummy_src, 256, 64, 64, nullptr);
 #if FLOW_FFI_HAS_CUDA
     EXPECT_EQ(err, FLOW_ERROR_INVALID_HANDLE);
 #else
@@ -345,7 +338,8 @@ TEST_F(CudaTextureInteropTest, WriteIntoUnknownHandleReturnsError) {
 // ---------------------------------------------------------------------------
 // A10: signal_frame_available is a no-op when registrar/ops not bound
 // ---------------------------------------------------------------------------
-TEST_F(CudaTextureInteropTest, SignalFrameAvailableIsNoOpWhenUnbound) {
+TEST_F(CudaTextureInteropTest, SignalFrameAvailableIsNoOpWhenUnbound)
+{
     // Should not crash.
     flow_ffi_signal_frame_available(42LL);
     EXPECT_EQ(g_mock_state.mark_frame_count, 0);
@@ -354,7 +348,8 @@ TEST_F(CudaTextureInteropTest, SignalFrameAvailableIsNoOpWhenUnbound) {
 // ---------------------------------------------------------------------------
 // A11: signal_frame_available for an unknown texture_id is a no-op
 // ---------------------------------------------------------------------------
-TEST_F(CudaTextureInteropTest, SignalFrameAvailableUnknownIdIsNoOp) {
+TEST_F(CudaTextureInteropTest, SignalFrameAvailableUnknownIdIsNoOp)
+{
     bind_mock_ops();
     flow_ffi_signal_frame_available(99999LL);
     EXPECT_EQ(g_mock_state.mark_frame_count, 0);
@@ -363,7 +358,8 @@ TEST_F(CudaTextureInteropTest, SignalFrameAvailableUnknownIdIsNoOp) {
 // ---------------------------------------------------------------------------
 // A12: flow_ffi_is_texture_ops_bound reflects set/clear
 // ---------------------------------------------------------------------------
-TEST_F(CudaTextureInteropTest, TextureOpsBoundStateTransitions) {
+TEST_F(CudaTextureInteropTest, TextureOpsBoundStateTransitions)
+{
     EXPECT_EQ(flow_ffi_is_texture_ops_bound(), 0);
     flow_ffi_set_texture_ops(&kMockOps);
     EXPECT_NE(flow_ffi_is_texture_ops_bound(), 0);
@@ -386,14 +382,14 @@ TEST_F(CudaTextureInteropTest, TextureOpsBoundStateTransitions) {
 // test verifies that the stub correctly returns NOT_IMPLEMENTED regardless
 // of the ops state.
 // ---------------------------------------------------------------------------
-TEST_F(CudaTextureInteropTest, MockLifecycleRegisterSignalUnregister) {
+TEST_F(CudaTextureInteropTest, MockLifecycleRegisterSignalUnregister)
+{
 #if !FLOW_FFI_HAS_CUDA
     // Stub build: verify stub behaviour.
     bind_mock_ops();
     FlowCudaTextureHandle handle = nullptr;
-    int64_t               tex_id = -1;
-    FlowError err = flow_ffi_register_cuda_flutter_texture(
-        64, 64, &handle, &tex_id);
+    int64_t tex_id               = -1;
+    FlowError err                = flow_ffi_register_cuda_flutter_texture(64, 64, &handle, &tex_id);
     EXPECT_EQ(err, FLOW_ERROR_NOT_IMPLEMENTED);
     return;
 #else
@@ -413,13 +409,11 @@ TEST_F(CudaTextureInteropTest, MockLifecycleRegisterSignalUnregister) {
     bind_mock_ops();
 
     FlowCudaTextureHandle handle = nullptr;
-    int64_t               tex_id = -1;
-    FlowError err = flow_ffi_register_cuda_flutter_texture(
-        64, 64, &handle, &tex_id);
+    int64_t tex_id               = -1;
+    FlowError err                = flow_ffi_register_cuda_flutter_texture(64, 64, &handle, &tex_id);
 
     // Register must succeed: create callback was called, handle is valid.
-    ASSERT_EQ(err, FLOW_SUCCESS) << "Unexpected error from register: "
-                                 << static_cast<int>(err);
+    ASSERT_EQ(err, FLOW_SUCCESS) << "Unexpected error from register: " << static_cast<int>(err);
     ASSERT_NE(handle, nullptr);
     ASSERT_GT(tex_id, -1LL);
 
@@ -448,65 +442,74 @@ TEST_F(CudaTextureInteropTest, MockLifecycleRegisterSignalUnregister) {
 // context (EGL PBuffer).  Skipped automatically if any of these are absent.
 // ---------------------------------------------------------------------------
 #if FLOW_FFI_HAS_CUDA
-TEST_F(CudaTextureInteropTest, GpuWriteVerification) {
+TEST_F(CudaTextureInteropTest, GpuWriteVerification)
+{
     // (0) Skip if no CUDA device.
     int device_count = 0;
-    if (cudaGetDeviceCount(&device_count) != cudaSuccess || device_count == 0) {
+    if (cudaGetDeviceCount(&device_count) != cudaSuccess || device_count == 0)
+    {
         GTEST_SKIP() << "No CUDA devices available";
     }
 
     // (1) Create an EGL PBuffer context for headless GL.
     EGLDisplay egl_display = eglGetDisplay(EGL_DEFAULT_DISPLAY);
-    if (egl_display == EGL_NO_DISPLAY) {
+    if (egl_display == EGL_NO_DISPLAY)
+    {
         GTEST_SKIP() << "No EGL display available (headless environment)";
     }
 
     EGLint major = 0, minor = 0;
-    if (!eglInitialize(egl_display, &major, &minor)) {
+    if (!eglInitialize(egl_display, &major, &minor))
+    {
         GTEST_SKIP() << "eglInitialize failed";
     }
 
-    static const EGLint kConfigAttribs[] = {
-        EGL_SURFACE_TYPE,   EGL_PBUFFER_BIT,
-        EGL_RENDERABLE_TYPE, EGL_OPENGL_BIT,
-        EGL_RED_SIZE,   8,
-        EGL_GREEN_SIZE, 8,
-        EGL_BLUE_SIZE,  8,
-        EGL_ALPHA_SIZE, 8,
-        EGL_NONE
-    };
-    EGLConfig egl_config = nullptr;
-    EGLint    num_configs = 0;
-    if (!eglChooseConfig(egl_display, kConfigAttribs, &egl_config, 1, &num_configs)
-        || num_configs == 0)
+    static const EGLint kConfigAttribs[] = {EGL_SURFACE_TYPE,
+                                            EGL_PBUFFER_BIT,
+                                            EGL_RENDERABLE_TYPE,
+                                            EGL_OPENGL_BIT,
+                                            EGL_RED_SIZE,
+                                            8,
+                                            EGL_GREEN_SIZE,
+                                            8,
+                                            EGL_BLUE_SIZE,
+                                            8,
+                                            EGL_ALPHA_SIZE,
+                                            8,
+                                            EGL_NONE};
+    EGLConfig egl_config                 = nullptr;
+    EGLint num_configs                   = 0;
+    if (!eglChooseConfig(egl_display, kConfigAttribs, &egl_config, 1, &num_configs) || num_configs == 0)
     {
         eglTerminate(egl_display);
         GTEST_SKIP() << "No suitable EGL config";
     }
 
-    static const EGLint kPBufAttribs[] = {
-        EGL_WIDTH, 1, EGL_HEIGHT, 1, EGL_NONE
-    };
-    EGLSurface pbuf = eglCreatePbufferSurface(egl_display, egl_config, kPBufAttribs);
-    if (pbuf == EGL_NO_SURFACE) {
+    static const EGLint kPBufAttribs[] = {EGL_WIDTH, 1, EGL_HEIGHT, 1, EGL_NONE};
+    EGLSurface pbuf                    = eglCreatePbufferSurface(egl_display, egl_config, kPBufAttribs);
+    if (pbuf == EGL_NO_SURFACE)
+    {
         eglTerminate(egl_display);
         GTEST_SKIP() << "eglCreatePbufferSurface failed";
     }
 
-    if (!eglBindAPI(EGL_OPENGL_API)) {
+    if (!eglBindAPI(EGL_OPENGL_API))
+    {
         eglDestroySurface(egl_display, pbuf);
         eglTerminate(egl_display);
         GTEST_SKIP() << "eglBindAPI failed";
     }
 
     EGLContext egl_ctx = eglCreateContext(egl_display, egl_config, EGL_NO_CONTEXT, nullptr);
-    if (egl_ctx == EGL_NO_CONTEXT) {
+    if (egl_ctx == EGL_NO_CONTEXT)
+    {
         eglDestroySurface(egl_display, pbuf);
         eglTerminate(egl_display);
         GTEST_SKIP() << "eglCreateContext failed";
     }
 
-    if (!eglMakeCurrent(egl_display, pbuf, pbuf, egl_ctx)) {
+    if (!eglMakeCurrent(egl_display, pbuf, pbuf, egl_ctx))
+    {
         eglDestroyContext(egl_display, egl_ctx);
         eglDestroySurface(egl_display, pbuf);
         eglTerminate(egl_display);
@@ -520,28 +523,26 @@ TEST_F(CudaTextureInteropTest, GpuWriteVerification) {
     GLuint gl_name = 0;
     glGenTextures(1, &gl_name);
     glBindTexture(GL_TEXTURE_2D, gl_name);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, W, H, 0,
-                 GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, W, H, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S,     GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T,     GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glBindTexture(GL_TEXTURE_2D, 0);
     ASSERT_NE(gl_name, 0u) << "glGenTextures failed";
 
     // (3) Register the GL texture with CUDA directly (testing interop).
     cudaGraphicsResource_t cuda_res = nullptr;
-    cudaError_t cuda_err = cudaGraphicsGLRegisterImage(
-        &cuda_res, gl_name, GL_TEXTURE_2D,
-        cudaGraphicsRegisterFlagsWriteDiscard);
-    if (cuda_err != cudaSuccess) {
+    cudaError_t cuda_err =
+        cudaGraphicsGLRegisterImage(&cuda_res, gl_name, GL_TEXTURE_2D, cudaGraphicsRegisterFlagsWriteDiscard);
+    if (cuda_err != cudaSuccess)
+    {
         glDeleteTextures(1, &gl_name);
         eglMakeCurrent(egl_display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
         eglDestroyContext(egl_display, egl_ctx);
         eglDestroySurface(egl_display, pbuf);
         eglTerminate(egl_display);
-        GTEST_SKIP() << "cudaGraphicsGLRegisterImage failed: "
-                     << cudaGetErrorString(cuda_err)
+        GTEST_SKIP() << "cudaGraphicsGLRegisterImage failed: " << cudaGetErrorString(cuda_err)
                      << " — likely no CUDA/GL interop in this environment";
     }
 
@@ -549,7 +550,7 @@ TEST_F(CudaTextureInteropTest, GpuWriteVerification) {
     constexpr uint8_t kPattern = 0xAB;
     const size_t pitch_bytes   = static_cast<size_t>(W) * 4;
     const size_t total_bytes   = pitch_bytes * static_cast<size_t>(H);
-    void* d_src = nullptr;
+    void* d_src                = nullptr;
     ASSERT_EQ(cudaMalloc(&d_src, total_bytes), cudaSuccess);
     ASSERT_EQ(cudaMemset(d_src, kPattern, total_bytes), cudaSuccess);
 
@@ -562,14 +563,11 @@ TEST_F(CudaTextureInteropTest, GpuWriteVerification) {
     ASSERT_EQ(cuda_err, cudaSuccess);
 
     cudaArray_t dst_array = nullptr;
-    cuda_err = cudaGraphicsSubResourceGetMappedArray(&dst_array, cuda_res, 0, 0);
+    cuda_err              = cudaGraphicsSubResourceGetMappedArray(&dst_array, cuda_res, 0, 0);
     ASSERT_EQ(cuda_err, cudaSuccess);
 
-    cuda_err = cudaMemcpy2DToArrayAsync(
-        dst_array, 0, 0,
-        d_src, pitch_bytes,
-        pitch_bytes, static_cast<size_t>(H),
-        cudaMemcpyDeviceToDevice, stream);
+    cuda_err = cudaMemcpy2DToArrayAsync(dst_array, 0, 0, d_src, pitch_bytes, pitch_bytes, static_cast<size_t>(H),
+                                        cudaMemcpyDeviceToDevice, stream);
     ASSERT_EQ(cuda_err, cudaSuccess);
 
     cuda_err = cudaGraphicsUnmapResources(1, &cuda_res, stream);
@@ -584,11 +582,8 @@ TEST_F(CudaTextureInteropTest, GpuWriteVerification) {
 
     void* d_readback = nullptr;
     ASSERT_EQ(cudaMalloc(&d_readback, total_bytes), cudaSuccess);
-    cuda_err = cudaMemcpy2DFromArrayAsync(
-        d_readback, pitch_bytes,
-        dst_array, 0, 0,
-        pitch_bytes, static_cast<size_t>(H),
-        cudaMemcpyDeviceToDevice, stream);
+    cuda_err = cudaMemcpy2DFromArrayAsync(d_readback, pitch_bytes, dst_array, 0, 0, pitch_bytes, static_cast<size_t>(H),
+                                          cudaMemcpyDeviceToDevice, stream);
     ASSERT_EQ(cuda_err, cudaSuccess);
     cuda_err = cudaGraphicsUnmapResources(1, &cuda_res, stream);
     ASSERT_EQ(cuda_err, cudaSuccess);
@@ -596,17 +591,17 @@ TEST_F(CudaTextureInteropTest, GpuWriteVerification) {
 
     // Copy readback to host.
     std::vector<uint8_t> host(total_bytes, 0);
-    ASSERT_EQ(cudaMemcpy(host.data(), d_readback, total_bytes, cudaMemcpyDeviceToHost),
-              cudaSuccess);
+    ASSERT_EQ(cudaMemcpy(host.data(), d_readback, total_bytes, cudaMemcpyDeviceToHost), cudaSuccess);
 
     // (8) Verify all bytes equal 0xAB.
     bool all_match = true;
-    for (size_t i = 0; i < total_bytes; ++i) {
-        if (host[i] != kPattern) {
+    for (size_t i = 0; i < total_bytes; ++i)
+    {
+        if (host[i] != kPattern)
+        {
             all_match = false;
-            ADD_FAILURE() << "Byte mismatch at index " << i
-                          << ": expected 0x" << std::hex << (int)kPattern
-                          << " got 0x" << (int)host[i];
+            ADD_FAILURE() << "Byte mismatch at index " << i << ": expected 0x" << std::hex << (int)kPattern << " got 0x"
+                          << (int)host[i];
             break;
         }
     }

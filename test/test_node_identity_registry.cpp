@@ -23,12 +23,12 @@
 // We pass nullptr for env; the Node constructor accepts it without asserting.
 // We never call InvokeCompute() so _env is never dereferenced.
 // ---------------------------------------------------------------------------
-class TestNode : public flow::Node {
-public:
-    TestNode()
-        : flow::Node(flow::UUID(), "TestNode", "test_instance", nullptr) {}
+class TestNode : public flow::Node
+{
+  public:
+    TestNode() : flow::Node(flow::UUID(), "TestNode", "test_instance", nullptr) {}
 
-protected:
+  protected:
     void Compute() override {}
 };
 
@@ -36,26 +36,22 @@ protected:
 // Test fixture: clears the global singleton registry before and after each
 // test to ensure isolation between cases.
 // ---------------------------------------------------------------------------
-class NodeIdentityRegistryTest : public ::testing::Test {
-protected:
-    void SetUp() override {
-        flow_ffi::HandleRegistry::instance().clear();
-    }
+class NodeIdentityRegistryTest : public ::testing::Test
+{
+  protected:
+    void SetUp() override { flow_ffi::HandleRegistry::instance().clear(); }
 
-    void TearDown() override {
-        flow_ffi::HandleRegistry::instance().clear();
-    }
+    void TearDown() override { flow_ffi::HandleRegistry::instance().clear(); }
 
-    flow::SharedNode make_node() {
-        return std::make_shared<TestNode>();
-    }
+    flow::SharedNode make_node() { return std::make_shared<TestNode>(); }
 };
 
 // ---------------------------------------------------------------------------
 // (a) Two lookups of the same node must return the same void* (identity keyed).
 // Covers CC1: initial create starts at refcount 1; second get retains to 2.
 // ---------------------------------------------------------------------------
-TEST_F(NodeIdentityRegistryTest, SameNodeYieldsSameHandle) {
+TEST_F(NodeIdentityRegistryTest, SameNodeYieldsSameHandle)
+{
     auto node = make_node();
 
     void* h1 = flow_ffi::get_or_create_node_handle(node);
@@ -65,8 +61,7 @@ TEST_F(NodeIdentityRegistryTest, SameNodeYieldsSameHandle) {
     ASSERT_NE(h2, nullptr);
 
     EXPECT_EQ(h1, h2) << "Two lookups of the same node must return the same void*";
-    EXPECT_EQ(flow_get_ref_count(h1), 2)
-        << "Ref-count must equal number of outstanding hand-outs";
+    EXPECT_EQ(flow_get_ref_count(h1), 2) << "Ref-count must equal number of outstanding hand-outs";
 
     // Clean up: release once per hand-out.
     flow_release_handle(h1);
@@ -78,21 +73,21 @@ TEST_F(NodeIdentityRegistryTest, SameNodeYieldsSameHandle) {
 // (b) Refcount increments per hand-out; node erased only after last release.
 // Covers CC1: refcount == N outstanding wrappers.
 // ---------------------------------------------------------------------------
-TEST_F(NodeIdentityRegistryTest, RefcountTracksHandouts) {
+TEST_F(NodeIdentityRegistryTest, RefcountTracksHandouts)
+{
     auto node = make_node();
 
     void* h1 = flow_ffi::get_or_create_node_handle(node);
     EXPECT_EQ(flow_get_ref_count(h1), 1);
 
     void* h2 = flow_ffi::get_or_create_node_handle(node);
-    EXPECT_EQ(flow_get_ref_count(h1), 2);  // same pointer
+    EXPECT_EQ(flow_get_ref_count(h1), 2); // same pointer
 
     void* h3 = flow_ffi::get_or_create_node_handle(node);
     EXPECT_EQ(flow_get_ref_count(h1), 3);
 
     flow_release_handle(h1);
-    EXPECT_TRUE(flow_is_valid_handle(h1))
-        << "Handle must survive while other wrappers are outstanding";
+    EXPECT_TRUE(flow_is_valid_handle(h1)) << "Handle must survive while other wrappers are outstanding";
     EXPECT_EQ(flow_get_ref_count(h1), 2);
 
     flow_release_handle(h2);
@@ -100,22 +95,22 @@ TEST_F(NodeIdentityRegistryTest, RefcountTracksHandouts) {
     EXPECT_EQ(flow_get_ref_count(h1), 1);
 
     flow_release_handle(h3);
-    EXPECT_FALSE(flow_is_valid_handle(h1))
-        << "Handle must be erased after last release";
+    EXPECT_FALSE(flow_is_valid_handle(h1)) << "Handle must be erased after last release";
 }
 
 // ---------------------------------------------------------------------------
 // (c) Release of one wrapper does not unregister while another is outstanding.
 // Covers CC1: partial release survival.
 // ---------------------------------------------------------------------------
-TEST_F(NodeIdentityRegistryTest, PartialReleaseDoesNotInvalidateHandle) {
+TEST_F(NodeIdentityRegistryTest, PartialReleaseDoesNotInvalidateHandle)
+{
     auto node = make_node();
 
     void* h_a = flow_ffi::get_or_create_node_handle(node);
     void* h_b = flow_ffi::get_or_create_node_handle(node);
     ASSERT_EQ(h_a, h_b) << "Both lookups must return the canonical handle";
 
-    flow_release_handle(h_a);  // simulate Dart GC of one wrapper
+    flow_release_handle(h_a); // simulate Dart GC of one wrapper
 
     // The second wrapper is still live; handle must be valid.
     EXPECT_TRUE(flow_is_valid_handle(h_b));
@@ -123,8 +118,7 @@ TEST_F(NodeIdentityRegistryTest, PartialReleaseDoesNotInvalidateHandle) {
     // The NodeWrapper's SharedNode still points to the original node.
     auto* wrapper = flow_ffi::get_handle<NodeWrapper>(h_b);
     ASSERT_NE(wrapper, nullptr);
-    EXPECT_EQ(wrapper->node.get(), node.get())
-        << "Surviving handle must still point to the original node";
+    EXPECT_EQ(wrapper->node.get(), node.get()) << "Surviving handle must still point to the original node";
 
     flow_release_handle(h_b);
     EXPECT_FALSE(flow_is_valid_handle(h_b));
@@ -133,7 +127,8 @@ TEST_F(NodeIdentityRegistryTest, PartialReleaseDoesNotInvalidateHandle) {
 // ---------------------------------------------------------------------------
 // (d) Different nodes must get distinct handles (no aliasing regression).
 // ---------------------------------------------------------------------------
-TEST_F(NodeIdentityRegistryTest, DifferentNodesGetDistinctHandles) {
+TEST_F(NodeIdentityRegistryTest, DifferentNodesGetDistinctHandles)
+{
     auto node_a = make_node();
     auto node_b = make_node();
 
@@ -153,13 +148,14 @@ TEST_F(NodeIdentityRegistryTest, DifferentNodesGetDistinctHandles) {
 // CC3): after final release, get_or_create creates a FRESH entry at refcount 1,
 // not 2+.
 // ---------------------------------------------------------------------------
-TEST_F(NodeIdentityRegistryTest, UnregisterClearsSecondaryIndex) {
+TEST_F(NodeIdentityRegistryTest, UnregisterClearsSecondaryIndex)
+{
     auto node = make_node();
 
     void* h = flow_ffi::get_or_create_node_handle(node);
     ASSERT_NE(h, nullptr);
 
-    flow_release_handle(h);  // refcount hits 0, both maps cleared.
+    flow_release_handle(h); // refcount hits 0, both maps cleared.
     EXPECT_FALSE(flow_is_valid_handle(h));
 
     // Re-creating via get_or_create must produce a NEW entry (no stale secondary hit).
@@ -167,8 +163,7 @@ TEST_F(NodeIdentityRegistryTest, UnregisterClearsSecondaryIndex) {
     ASSERT_NE(h2, nullptr);
 
     // Refcount must start at 1 (fresh creation), not accumulate from old entry.
-    EXPECT_EQ(flow_get_ref_count(h2), 1)
-        << "Re-created handle must start at refcount 1, not accumulate from old entry";
+    EXPECT_EQ(flow_get_ref_count(h2), 1) << "Re-created handle must start at refcount 1, not accumulate from old entry";
 
     flow_release_handle(h2);
     EXPECT_EQ(flow_ffi::HandleRegistry::instance().get_handle_count(), 0);
@@ -180,17 +175,20 @@ TEST_F(NodeIdentityRegistryTest, UnregisterClearsSecondaryIndex) {
 // Each thread does kItersPerThread balanced get/release pairs.
 // After all threads join, registry must be empty.
 // ---------------------------------------------------------------------------
-TEST_F(NodeIdentityRegistryTest, ConcurrentHandoutsAreRaceFree) {
-    auto node = make_node();
-    constexpr int kThreads = 16;
+TEST_F(NodeIdentityRegistryTest, ConcurrentHandoutsAreRaceFree)
+{
+    auto node                     = make_node();
+    constexpr int kThreads        = 16;
     constexpr int kItersPerThread = 100;
 
     std::vector<std::thread> threads;
     threads.reserve(kThreads);
 
-    for (int t = 0; t < kThreads; ++t) {
+    for (int t = 0; t < kThreads; ++t)
+    {
         threads.emplace_back([&node]() {
-            for (int i = 0; i < kItersPerThread; ++i) {
+            for (int i = 0; i < kItersPerThread; ++i)
+            {
                 void* h = flow_ffi::get_or_create_node_handle(node);
                 // Brief check and immediate release to maximise interleaving.
                 flow_release_handle(h);
@@ -198,7 +196,8 @@ TEST_F(NodeIdentityRegistryTest, ConcurrentHandoutsAreRaceFree) {
         });
     }
 
-    for (auto& th : threads) th.join();
+    for (auto& th : threads)
+        th.join();
 
     // After all balanced retains/releases, registry must have zero handles.
     EXPECT_EQ(flow_ffi::HandleRegistry::instance().get_handle_count(), 0)
