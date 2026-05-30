@@ -6,17 +6,19 @@
 //
 // Exit code 0 = pass; any non-zero = fail (symbol missing / crash / bad result).
 
-#include <flow_ffi_cuda.h>
 #include <cstdio>
 #include <cstring>
+#include <flow_ffi_cuda.h>
 
-int main() {
+int main()
+{
     bool avail = flow_ffi_cuda_available();
-    int  count = flow_ffi_cuda_device_count();
+    int count  = flow_ffi_cuda_device_count();
 
     printf("available=%d count=%d", (int)avail, count);
 
-    for (int i = 0; i < count; ++i) {
+    for (int i = 0; i < count; ++i)
+    {
         const char* name = flow_ffi_cuda_device_name(i);
         printf(" device[%d]=%s", i, name ? name : "(null)");
     }
@@ -25,25 +27,30 @@ int main() {
 
     // Consistency checks:
     // 1. If available=1, count must be >= 1.
-    if (avail && count <= 0) {
+    if (avail && count <= 0)
+    {
         fprintf(stderr, "FAIL: available=true but device count=%d\n", count);
         return 1;
     }
     // 2. If available=0, count must be 0.
-    if (!avail && count != 0) {
+    if (!avail && count != 0)
+    {
         fprintf(stderr, "FAIL: available=false but device count=%d\n", count);
         return 1;
     }
     // 3. Out-of-range device name must return "" not crash.
     const char* oob = flow_ffi_cuda_device_name(-1);
-    if (oob == nullptr) {
+    if (oob == nullptr)
+    {
         fprintf(stderr, "FAIL: flow_ffi_cuda_device_name(-1) returned nullptr\n");
         return 1;
     }
     // 4. Each valid device name must be non-null and non-empty.
-    for (int i = 0; i < count; ++i) {
+    for (int i = 0; i < count; ++i)
+    {
         const char* n = flow_ffi_cuda_device_name(i);
-        if (!n || strlen(n) == 0) {
+        if (!n || strlen(n) == 0)
+        {
             fprintf(stderr, "FAIL: device[%d] name is null or empty\n", i);
             return 1;
         }

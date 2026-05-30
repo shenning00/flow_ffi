@@ -42,49 +42,56 @@
 //   releases it before any CUDA blocking operations to avoid holding it during
 //   GPU work.
 
-#include "flow_ffi_cuda.h"
 #include "flow_ffi.h"
+#include "flow_ffi_cuda.h"
 
-#include <cuda_runtime.h>
 #include <cuda_gl_interop.h>
+#include <cuda_runtime.h>
 
 #include <cstdint>
+#include <cstdio>
 #include <memory>
 #include <mutex>
 #include <unordered_map>
-#include <cstdio>
 
 // ---------------------------------------------------------------------------
 // Internal helpers / RAII
 // ---------------------------------------------------------------------------
 
-namespace {
+namespace
+{
 
 // Log helper — not exported, purely for internal diagnostics.
-static void cuda_log_error(const char* context, cudaError_t err) {
-    std::fprintf(stderr,
-        "[flow_ffi CUDA] %s failed: %s (%d)\n",
-        context, cudaGetErrorString(err), static_cast<int>(err));
+static void cuda_log_error(const char* context, cudaError_t err)
+{
+    std::fprintf(stderr, "[flow_ffi CUDA] %s failed: %s (%d)\n", context, cudaGetErrorString(err),
+                 static_cast<int>(err));
 }
 
 // RAII: owns a cudaStream_t and destroys it on scope exit.
-struct CudaStreamGuard {
+struct CudaStreamGuard
+{
     cudaStream_t stream{nullptr};
-    bool         released{false};
+    bool released{false};
 
-    CudaStreamGuard() {
+    CudaStreamGuard()
+    {
         cudaError_t e = cudaStreamCreate(&stream);
-        if (e != cudaSuccess) {
+        if (e != cudaSuccess)
+        {
             cuda_log_error("cudaStreamCreate", e);
             stream = nullptr;
         }
     }
-    ~CudaStreamGuard() {
-        if (!released && stream) {
+    ~CudaStreamGuard()
+    {
+        if (!released && stream)
+        {
             cudaStreamDestroy(stream);
         }
     }
-    cudaStream_t release() {
+    cudaStream_t release()
+    {
         released = true;
         return stream;
     }
@@ -92,17 +99,21 @@ struct CudaStreamGuard {
 };
 
 // RAII: owns a cudaGraphicsResource_t and unregisters it on scope exit.
-struct CudaGraphicsResourceGuard {
+struct CudaGraphicsResourceGuard
+{
     cudaGraphicsResource_t res{nullptr};
-    bool                   released{false};
+    bool released{false};
 
     explicit CudaGraphicsResourceGuard(cudaGraphicsResource_t r) : res(r) {}
-    ~CudaGraphicsResourceGuard() {
-        if (!released && res) {
+    ~CudaGraphicsResourceGuard()
+    {
+        if (!released && res)
+        {
             cudaGraphicsUnregisterResource(res);
         }
     }
-    cudaGraphicsResource_t release() {
+    cudaGraphicsResource_t release()
+    {
         released = true;
         return res;
     }
@@ -112,29 +123,30 @@ struct CudaGraphicsResourceGuard {
 // Per-texture state
 // ---------------------------------------------------------------------------
 
-struct CudaTextureState {
-    uint32_t               gl_texture_name{0};
+struct CudaTextureState
+{
+    uint32_t gl_texture_name{0};
     // cuda_resource is written by the plugin's wait_initialized callback once
     // populate() has completed GL+CUDA registration on the raster thread.
     // It must not be accessed until wait_initialized returns success.
     cudaGraphicsResource_t cuda_resource{nullptr};
-    int64_t                flutter_texture_id{-1};
-    int32_t                width{0};
-    int32_t                height{0};
-    void*                  flutter_texture_object{nullptr}; // GObject*, ref owned by us
-    cudaStream_t           stream{nullptr};
+    int64_t flutter_texture_id{-1};
+    int32_t width{0};
+    int32_t height{0};
+    void* flutter_texture_object{nullptr}; // GObject*, ref owned by us
+    cudaStream_t stream{nullptr};
 };
 
 // ---------------------------------------------------------------------------
 // Registry
 // ---------------------------------------------------------------------------
 
-static std::mutex                                           g_registry_mutex;
-static std::unordered_map<FlowCudaTextureHandle,
-                          std::unique_ptr<CudaTextureState>> g_registry;
+static std::mutex g_registry_mutex;
+static std::unordered_map<FlowCudaTextureHandle, std::unique_ptr<CudaTextureState>> g_registry;
 
 // Look up state; caller must hold g_registry_mutex.
-static CudaTextureState* find_state_locked(FlowCudaTextureHandle handle) {
+static CudaTextureState* find_state_locked(FlowCudaTextureHandle handle)
+{
     auto it = g_registry.find(handle);
     if (it == g_registry.end()) return nullptr;
     return it->second.get();
@@ -146,57 +158,55 @@ static CudaTextureState* find_state_locked(FlowCudaTextureHandle handle) {
 // Public FFI implementations
 // ---------------------------------------------------------------------------
 
-extern "C" FlowError flow_ffi_register_cuda_flutter_texture(
-    int32_t                width,
-    int32_t                height,
-    FlowCudaTextureHandle* out_handle,
-    int64_t*               out_flutter_texture_id)
+extern "C" FlowError flow_ffi_register_cuda_flutter_texture(int32_t width, int32_t height,
+                                                            FlowCudaTextureHandle* out_handle,
+                                                            int64_t* out_flutter_texture_id)
 {
     // Clear outputs first.
-    if (out_handle)             *out_handle             = nullptr;
+    if (out_handle) *out_handle = nullptr;
     if (out_flutter_texture_id) *out_flutter_texture_id = -1;
 
     // (1) Validate arguments.
-    if (width <= 0 || height <= 0) {
-        flow_set_error(FLOW_ERROR_INVALID_ARGUMENT,
-                       "flow_ffi_register_cuda_flutter_texture: "
-                       "width and height must be positive");
+    if (width <= 0 || height <= 0)
+    {
+        flow_set_error(FLOW_ERROR_INVALID_ARGUMENT, "flow_ffi_register_cuda_flutter_texture: "
+                                                    "width and height must be positive");
         return FLOW_ERROR_INVALID_ARGUMENT;
     }
-    if (!out_handle || !out_flutter_texture_id) {
-        flow_set_error(FLOW_ERROR_INVALID_ARGUMENT,
-                       "flow_ffi_register_cuda_flutter_texture: "
-                       "out_handle and out_flutter_texture_id must not be null");
+    if (!out_handle || !out_flutter_texture_id)
+    {
+        flow_set_error(FLOW_ERROR_INVALID_ARGUMENT, "flow_ffi_register_cuda_flutter_texture: "
+                                                    "out_handle and out_flutter_texture_id must not be null");
         return FLOW_ERROR_INVALID_ARGUMENT;
     }
 
     // (2) Confirm the texture registrar is bound (plugin has loaded).
-    if (!flow_ffi_is_texture_registrar_bound()) {
-        flow_set_error(FLOW_ERROR_NOT_IMPLEMENTED,
-                       "flow_ffi_register_cuda_flutter_texture: "
-                       "FlTextureRegistrar not yet bound — "
-                       "the Flutter plugin has not registered");
+    if (!flow_ffi_is_texture_registrar_bound())
+    {
+        flow_set_error(FLOW_ERROR_NOT_IMPLEMENTED, "flow_ffi_register_cuda_flutter_texture: "
+                                                   "FlTextureRegistrar not yet bound — "
+                                                   "the Flutter plugin has not registered");
         return FLOW_ERROR_NOT_IMPLEMENTED;
     }
 
     // (3) Confirm the texture ops callbacks are injected.
-    if (!flow_ffi_is_texture_ops_bound()) {
-        flow_set_error(FLOW_ERROR_NOT_IMPLEMENTED,
-                       "flow_ffi_register_cuda_flutter_texture: "
-                       "texture ops callbacks not yet bound — "
-                       "cuda_texture_bridge.cc has not injected them");
+    if (!flow_ffi_is_texture_ops_bound())
+    {
+        flow_set_error(FLOW_ERROR_NOT_IMPLEMENTED, "flow_ffi_register_cuda_flutter_texture: "
+                                                   "texture ops callbacks not yet bound — "
+                                                   "cuda_texture_bridge.cc has not injected them");
         return FLOW_ERROR_NOT_IMPLEMENTED;
     }
 
     FlowTextureOps ops = flow_ffi_get_texture_ops();
-    void*   registrar  = flow_ffi_get_texture_registrar();
+    void* registrar    = flow_ffi_get_texture_registrar();
 
     // (4) Create CUDA stream for this texture.
     CudaStreamGuard stream_guard;
-    if (!stream_guard.ok()) {
-        flow_set_error(FLOW_ERROR_UNKNOWN,
-                       "flow_ffi_register_cuda_flutter_texture: "
-                       "failed to create cudaStream");
+    if (!stream_guard.ok())
+    {
+        flow_set_error(FLOW_ERROR_UNKNOWN, "flow_ffi_register_cuda_flutter_texture: "
+                                           "failed to create cudaStream");
         return FLOW_ERROR_UNKNOWN;
     }
 
@@ -212,25 +222,24 @@ extern "C" FlowError flow_ffi_register_cuda_flutter_texture(
     // cudaGraphicsGLRegisterImage likewise happens there.  We therefore accept
     // gl_name == 0 here; the actual CUDA resource handle is obtained later via
     // wait_initialized().
-    void*    texture_object  = nullptr;
-    int64_t  texture_id      = -1;
-    uint32_t gl_name         = 0;
+    void* texture_object = nullptr;
+    int64_t texture_id   = -1;
+    uint32_t gl_name     = 0;
 
-    int rc = ops.create_gl_texture(registrar, width, height,
-                                   &texture_object, &texture_id, &gl_name);
-    if (rc != 0 || !texture_object || texture_id < 0) {
-        flow_set_error(FLOW_ERROR_UNKNOWN,
-                       "flow_ffi_register_cuda_flutter_texture: "
-                       "create_gl_texture callback failed");
+    int rc = ops.create_gl_texture(registrar, width, height, &texture_object, &texture_id, &gl_name);
+    if (rc != 0 || !texture_object || texture_id < 0)
+    {
+        flow_set_error(FLOW_ERROR_UNKNOWN, "flow_ffi_register_cuda_flutter_texture: "
+                                           "create_gl_texture callback failed");
         return FLOW_ERROR_UNKNOWN;
     }
 
     // (6) Build the state object and insert it into the registry.
     //     cuda_resource starts null; it is filled in by wait_initialized()
     //     before write_into() uses it.
-    auto state = std::make_unique<CudaTextureState>();
-    state->gl_texture_name        = gl_name;   // 0 until populate() fires
-    state->cuda_resource          = nullptr;   // set by wait_initialized()
+    auto state                    = std::make_unique<CudaTextureState>();
+    state->gl_texture_name        = gl_name; // 0 until populate() fires
+    state->cuda_resource          = nullptr; // set by wait_initialized()
     state->flutter_texture_id     = texture_id;
     state->width                  = width;
     state->height                 = height;
@@ -251,12 +260,11 @@ extern "C" FlowError flow_ffi_register_cuda_flutter_texture(
 
 // ---------------------------------------------------------------------------
 
-extern "C" FlowError flow_ffi_unregister_cuda_flutter_texture(
-    FlowCudaTextureHandle handle)
+extern "C" FlowError flow_ffi_unregister_cuda_flutter_texture(FlowCudaTextureHandle handle)
 {
-    if (!handle) {
-        flow_set_error(FLOW_ERROR_INVALID_HANDLE,
-                       "flow_ffi_unregister_cuda_flutter_texture: null handle");
+    if (!handle)
+    {
+        flow_set_error(FLOW_ERROR_INVALID_HANDLE, "flow_ffi_unregister_cuda_flutter_texture: null handle");
         return FLOW_ERROR_INVALID_HANDLE;
     }
 
@@ -264,10 +272,10 @@ extern "C" FlowError flow_ffi_unregister_cuda_flutter_texture(
     {
         std::lock_guard<std::mutex> lk(g_registry_mutex);
         auto it = g_registry.find(handle);
-        if (it == g_registry.end()) {
-            flow_set_error(FLOW_ERROR_INVALID_HANDLE,
-                           "flow_ffi_unregister_cuda_flutter_texture: "
-                           "handle not found in registry");
+        if (it == g_registry.end())
+        {
+            flow_set_error(FLOW_ERROR_INVALID_HANDLE, "flow_ffi_unregister_cuda_flutter_texture: "
+                                                      "handle not found in registry");
             return FLOW_ERROR_INVALID_HANDLE;
         }
         state = std::move(it->second);
@@ -275,14 +283,17 @@ extern "C" FlowError flow_ffi_unregister_cuda_flutter_texture(
     }
 
     // Synchronise the per-texture stream before tearing down resources.
-    if (state->stream) {
+    if (state->stream)
+    {
         cudaStreamSynchronize(state->stream);
     }
 
     // Unregister from CUDA.
-    if (state->cuda_resource) {
+    if (state->cuda_resource)
+    {
         cudaError_t e = cudaGraphicsUnregisterResource(state->cuda_resource);
-        if (e != cudaSuccess) {
+        if (e != cudaSuccess)
+        {
             cuda_log_error("cudaGraphicsUnregisterResource", e);
             // Continue cleanup — leaking the CUDA resource is better than
             // leaving the Flutter texture registered.
@@ -290,20 +301,21 @@ extern "C" FlowError flow_ffi_unregister_cuda_flutter_texture(
     }
 
     // Tell Flutter this texture is going away and release the GObject ref.
-    if (state->flutter_texture_object) {
-        if (flow_ffi_is_texture_ops_bound()) {
+    if (state->flutter_texture_object)
+    {
+        if (flow_ffi_is_texture_ops_bound())
+        {
             FlowTextureOps ops = flow_ffi_get_texture_ops();
             void* registrar    = flow_ffi_get_texture_registrar();
-            ops.destroy_gl_texture(registrar,
-                                   state->flutter_texture_object,
-                                   state->flutter_texture_id);
+            ops.destroy_gl_texture(registrar, state->flutter_texture_object, state->flutter_texture_id);
         }
         // If ops have been torn down (e.g. plugin unloaded), skip the call
         // to avoid a null-ptr dispatch; the Flutter engine cleans up on exit.
     }
 
     // Destroy CUDA stream.
-    if (state->stream) {
+    if (state->stream)
+    {
         cudaStreamDestroy(state->stream);
     }
 
@@ -312,18 +324,16 @@ extern "C" FlowError flow_ffi_unregister_cuda_flutter_texture(
 
 // ---------------------------------------------------------------------------
 
-extern "C" FlowError flow_ffi_cuda_write_into(
-    FlowCudaTextureHandle handle,
-    const void*           src_device_ptr,
-    int32_t               src_pitch_bytes,
-    int32_t               width,
-    int32_t               height,
-    void*                 producer_ready_event)
+extern "C" FlowError flow_ffi_cuda_write_into(FlowCudaTextureHandle handle, const void* src_device_ptr,
+                                              int32_t src_pitch_bytes, int32_t width, int32_t height,
+                                              void* producer_ready_event)
 {
-    if (!handle) {
+    if (!handle)
+    {
         return FLOW_ERROR_INVALID_HANDLE;
     }
-    if (!src_device_ptr || src_pitch_bytes <= 0 || width <= 0 || height <= 0) {
+    if (!src_device_ptr || src_pitch_bytes <= 0 || width <= 0 || height <= 0)
+    {
         return FLOW_ERROR_INVALID_ARGUMENT;
     }
 
@@ -332,23 +342,24 @@ extern "C" FlowError flow_ffi_cuda_write_into(
     {
         std::lock_guard<std::mutex> lk(g_registry_mutex);
         CudaTextureState* s = find_state_locked(handle);
-        if (!s) {
-            flow_set_error(FLOW_ERROR_INVALID_HANDLE,
-                           "flow_ffi_cuda_write_into: handle not in registry");
+        if (!s)
+        {
+            flow_set_error(FLOW_ERROR_INVALID_HANDLE, "flow_ffi_cuda_write_into: handle not in registry");
             return FLOW_ERROR_INVALID_HANDLE;
         }
         // Validate dimensions match registered texture.
-        if (width != s->width || height != s->height) {
-            flow_set_error(FLOW_ERROR_INVALID_ARGUMENT,
-                           "flow_ffi_cuda_write_into: dimensions mismatch — "
-                           "unregister and re-register on resize");
+        if (width != s->width || height != s->height)
+        {
+            flow_set_error(FLOW_ERROR_INVALID_ARGUMENT, "flow_ffi_cuda_write_into: dimensions mismatch — "
+                                                        "unregister and re-register on resize");
             return FLOW_ERROR_INVALID_ARGUMENT;
         }
         tex_obj = s->flutter_texture_object;
     }
     // Mutex released.
 
-    if (!flow_ffi_is_texture_ops_bound()) {
+    if (!flow_ffi_is_texture_ops_bound())
+    {
         return FLOW_SUCCESS; // ops torn down, nothing to do
     }
     FlowTextureOps ops = flow_ffi_get_texture_ops();
@@ -358,8 +369,9 @@ extern "C" FlowError flow_ffi_cuda_write_into(
     // allocated and submit_frame is safe to call.
     {
         void* dummy_cuda_res = nullptr;
-        int wait_rc = ops.wait_initialized(tex_obj, &dummy_cuda_res);
-        if (wait_rc != 0) {
+        int wait_rc          = ops.wait_initialized(tex_obj, &dummy_cuda_res);
+        if (wait_rc != 0)
+        {
             // Init failed or timed out — drop this frame silently.
             return FLOW_SUCCESS;
         }
@@ -369,13 +381,9 @@ extern "C" FlowError flow_ffi_cuda_write_into(
     // cudaMemcpy2DAsync into the staging buffer — no GL context required.
     // populate() on the raster thread does the GL-coupled Map/MemcpyToArray/
     // Unmap at the next vsync.
-    int submit_rc = ops.submit_frame(
-        tex_obj,
-        src_device_ptr,
-        src_pitch_bytes,
-        width, height,
-        producer_ready_event);
-    if (submit_rc != 0) {
+    int submit_rc = ops.submit_frame(tex_obj, src_device_ptr, src_pitch_bytes, width, height, producer_ready_event);
+    if (submit_rc != 0)
+    {
         // Frame dropped (dim mismatch, staging not ready, CUDA error).
         // Keep cascade moving — this is not a fatal condition.
         return FLOW_SUCCESS;
@@ -388,7 +396,8 @@ extern "C" FlowError flow_ffi_cuda_write_into(
 
 extern "C" void flow_ffi_signal_frame_available(int64_t flutter_texture_id)
 {
-    if (!flow_ffi_is_texture_ops_bound() || !flow_ffi_is_texture_registrar_bound()) {
+    if (!flow_ffi_is_texture_ops_bound() || !flow_ffi_is_texture_registrar_bound())
+    {
         return;
     }
 
@@ -396,19 +405,22 @@ extern "C" void flow_ffi_signal_frame_available(int64_t flutter_texture_id)
     void* texture_object = nullptr;
     {
         std::lock_guard<std::mutex> lk(g_registry_mutex);
-        for (auto& kv : g_registry) {
-            if (kv.second->flutter_texture_id == flutter_texture_id) {
+        for (auto& kv : g_registry)
+        {
+            if (kv.second->flutter_texture_id == flutter_texture_id)
+            {
                 texture_object = kv.second->flutter_texture_object;
                 break;
             }
         }
     }
 
-    if (!texture_object) {
-        return;  // Not found — caller may have already unregistered.
+    if (!texture_object)
+    {
+        return; // Not found — caller may have already unregistered.
     }
 
-    FlowTextureOps ops  = flow_ffi_get_texture_ops();
-    void*   registrar   = flow_ffi_get_texture_registrar();
+    FlowTextureOps ops = flow_ffi_get_texture_ops();
+    void* registrar    = flow_ffi_get_texture_registrar();
     ops.mark_frame_available(registrar, texture_object);
 }

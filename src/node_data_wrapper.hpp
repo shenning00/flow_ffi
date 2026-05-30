@@ -19,7 +19,8 @@
 
 using flow::SharedNodeData;
 
-struct NodeDataWrapper {
+struct NodeDataWrapper
+{
     SharedNodeData data;
     NodeDataWrapper(SharedNodeData d) : data(std::move(d)) {}
 };

@@ -15,8 +15,8 @@
 
 #include "env_wrapper.hpp"
 #include "handle_manager.hpp"
-#include "node_wrapper.hpp"
 #include "node_data_wrapper.hpp"
+#include "node_wrapper.hpp"
 
 #include <flow/core/Env.hpp>
 #include <flow/core/IndexableName.hpp>
@@ -36,12 +36,12 @@
 // Minimal concrete node used for handle-validation tests only.
 // nullptr env is safe as long as InvokeCompute() is never called.
 // ---------------------------------------------------------------------------
-class NullEnvNode : public flow::Node {
-public:
-    NullEnvNode()
-        : flow::Node(flow::UUID(), "NullEnvNode", "null_env", nullptr) {}
+class NullEnvNode : public flow::Node
+{
+  public:
+    NullEnvNode() : flow::Node(flow::UUID(), "NullEnvNode", "null_env", nullptr) {}
 
-protected:
+  protected:
     void Compute() override {}
 };
 
@@ -50,8 +50,9 @@ protected:
 // output port "result" (int32_t) = value * 2.  Used for the happy-path tests
 // that actually run compute on the worker thread (requires a real Env).
 // ---------------------------------------------------------------------------
-class DoublerNode : public flow::Node {
-public:
+class DoublerNode : public flow::Node
+{
+  public:
     DoublerNode(const flow::UUID& id, std::string_view name, std::shared_ptr<flow::Env> env)
         : flow::Node(id, "DoublerNode", name, std::move(env))
     {
@@ -59,7 +60,7 @@ public:
         AddOutput<int32_t>("result", "Result");
     }
 
-protected:
+  protected:
     void Compute() override
     {
         // The FFI layer creates data as detail::NodeData<int>, not
@@ -67,8 +68,9 @@ protected:
         // dynamic_pointer_cast to flow::NodeData<int32_t>) returns null.
         // Access via the base INodeData interface instead.
         const flow::SharedNodeData& raw = GetInputData("value");
-        int32_t v = 0;
-        if (raw) {
+        int32_t v                       = 0;
+        if (raw)
+        {
             auto* typed = dynamic_cast<flow::detail::NodeData<int32_t>*>(raw.get());
             if (typed) v = typed->Get();
         }
@@ -81,9 +83,11 @@ protected:
 // For tests that need a real Env, the fixture also provides env/factory/graph
 // handles, cleaned up in TearDown.
 // ---------------------------------------------------------------------------
-class EnvAddTaskSetInputDataTest : public ::testing::Test {
-protected:
-    void SetUp() override {
+class EnvAddTaskSetInputDataTest : public ::testing::Test
+{
+  protected:
+    void SetUp() override
+    {
         flow_ffi::HandleRegistry::instance().clear();
         flow_clear_error();
 
@@ -104,10 +108,23 @@ protected:
         ASSERT_NE(graph_handle_, nullptr) << "Could not create graph for test fixture";
     }
 
-    void TearDown() override {
-        if (graph_handle_)   { flow_graph_destroy(graph_handle_);        graph_handle_   = nullptr; }
-        if (factory_handle_) { flow_release_handle(factory_handle_);     factory_handle_ = nullptr; }
-        if (env_handle_)     { flow_env_destroy(env_handle_);            env_handle_     = nullptr; }
+    void TearDown() override
+    {
+        if (graph_handle_)
+        {
+            flow_graph_destroy(graph_handle_);
+            graph_handle_ = nullptr;
+        }
+        if (factory_handle_)
+        {
+            flow_release_handle(factory_handle_);
+            factory_handle_ = nullptr;
+        }
+        if (env_handle_)
+        {
+            flow_env_destroy(env_handle_);
+            env_handle_ = nullptr;
+        }
 
         flow_ffi::HandleRegistry::instance().clear();
         flow_clear_error();
@@ -115,59 +132,55 @@ protected:
 
     // Helper: add a DoublerNode to the test graph, return its FFI handle.
     // Caller does NOT own the returned handle — it is owned by the graph.
-    FlowNodeHandle add_doubler(const char* name = "d1") {
+    FlowNodeHandle add_doubler(const char* name = "d1")
+    {
         return flow_graph_add_node(graph_handle_, "DoublerNode", name);
     }
 
     // Helper: create an int32 data handle (caller must flow_release_handle).
-    FlowNodeDataHandle make_int_data(int32_t value) {
-        return flow_data_create_int(value);
-    }
+    FlowNodeDataHandle make_int_data(int32_t value) { return flow_data_create_int(value); }
 
-    FlowEnvHandle         env_handle_     = nullptr;
+    FlowEnvHandle env_handle_             = nullptr;
     FlowNodeFactoryHandle factory_handle_ = nullptr;
-    FlowGraphHandle       graph_handle_   = nullptr;
+    FlowGraphHandle graph_handle_         = nullptr;
 };
 
 // ============================================================================
 // (1) Handle validation: null / invalid handles → FLOW_ERROR_INVALID_HANDLE
 // ============================================================================
 
-TEST_F(EnvAddTaskSetInputDataTest, NullEnv_ReturnsInvalidHandle) {
+TEST_F(EnvAddTaskSetInputDataTest, NullEnv_ReturnsInvalidHandle)
+{
     // Create throwaway valid node and data handles.
-    auto raw_node = std::make_shared<NullEnvNode>();
+    auto raw_node  = std::make_shared<NullEnvNode>();
     auto* node_raw = flow_ffi::get_or_create_node_handle(raw_node);
-    auto node_h = reinterpret_cast<FlowNodeHandle>(node_raw);
-    auto data_h = make_int_data(42);
+    auto node_h    = reinterpret_cast<FlowNodeHandle>(node_raw);
+    auto data_h    = make_int_data(42);
     ASSERT_NE(data_h, nullptr);
 
-    EXPECT_EQ(
-        flow_env_add_task_set_input_data(nullptr, node_h, "value", data_h),
-        FLOW_ERROR_INVALID_HANDLE);
+    EXPECT_EQ(flow_env_add_task_set_input_data(nullptr, node_h, "value", data_h), FLOW_ERROR_INVALID_HANDLE);
 
     flow_release_handle(node_h);
     flow_release_handle(data_h);
 }
 
-TEST_F(EnvAddTaskSetInputDataTest, NullNode_ReturnsInvalidHandle) {
+TEST_F(EnvAddTaskSetInputDataTest, NullNode_ReturnsInvalidHandle)
+{
     auto data_h = make_int_data(42);
     ASSERT_NE(data_h, nullptr);
 
-    EXPECT_EQ(
-        flow_env_add_task_set_input_data(env_handle_, nullptr, "value", data_h),
-        FLOW_ERROR_INVALID_HANDLE);
+    EXPECT_EQ(flow_env_add_task_set_input_data(env_handle_, nullptr, "value", data_h), FLOW_ERROR_INVALID_HANDLE);
 
     flow_release_handle(data_h);
 }
 
-TEST_F(EnvAddTaskSetInputDataTest, NullData_ReturnsInvalidHandle) {
-    auto raw_node = std::make_shared<NullEnvNode>();
+TEST_F(EnvAddTaskSetInputDataTest, NullData_ReturnsInvalidHandle)
+{
+    auto raw_node  = std::make_shared<NullEnvNode>();
     auto* node_raw = flow_ffi::get_or_create_node_handle(raw_node);
-    auto node_h = reinterpret_cast<FlowNodeHandle>(node_raw);
+    auto node_h    = reinterpret_cast<FlowNodeHandle>(node_raw);
 
-    EXPECT_EQ(
-        flow_env_add_task_set_input_data(env_handle_, node_h, "value", nullptr),
-        FLOW_ERROR_INVALID_HANDLE);
+    EXPECT_EQ(flow_env_add_task_set_input_data(env_handle_, node_h, "value", nullptr), FLOW_ERROR_INVALID_HANDLE);
 
     flow_release_handle(node_h);
 }
@@ -176,31 +189,29 @@ TEST_F(EnvAddTaskSetInputDataTest, NullData_ReturnsInvalidHandle) {
 // (2) Port-key validation: null or empty → FLOW_ERROR_INVALID_ARGUMENT
 // ============================================================================
 
-TEST_F(EnvAddTaskSetInputDataTest, NullPortKey_ReturnsInvalidArgument) {
+TEST_F(EnvAddTaskSetInputDataTest, NullPortKey_ReturnsInvalidArgument)
+{
     FlowNodeHandle node_h = add_doubler();
     ASSERT_NE(node_h, nullptr);
 
     auto data_h = make_int_data(7);
     ASSERT_NE(data_h, nullptr);
 
-    EXPECT_EQ(
-        flow_env_add_task_set_input_data(env_handle_, node_h, nullptr, data_h),
-        FLOW_ERROR_INVALID_ARGUMENT);
+    EXPECT_EQ(flow_env_add_task_set_input_data(env_handle_, node_h, nullptr, data_h), FLOW_ERROR_INVALID_ARGUMENT);
 
     flow_release_handle(data_h);
     // node_h is graph-owned; do not release separately.
 }
 
-TEST_F(EnvAddTaskSetInputDataTest, EmptyPortKey_ReturnsInvalidArgument) {
+TEST_F(EnvAddTaskSetInputDataTest, EmptyPortKey_ReturnsInvalidArgument)
+{
     FlowNodeHandle node_h = add_doubler();
     ASSERT_NE(node_h, nullptr);
 
     auto data_h = make_int_data(7);
     ASSERT_NE(data_h, nullptr);
 
-    EXPECT_EQ(
-        flow_env_add_task_set_input_data(env_handle_, node_h, "", data_h),
-        FLOW_ERROR_INVALID_ARGUMENT);
+    EXPECT_EQ(flow_env_add_task_set_input_data(env_handle_, node_h, "", data_h), FLOW_ERROR_INVALID_ARGUMENT);
 
     flow_release_handle(data_h);
 }
@@ -209,7 +220,8 @@ TEST_F(EnvAddTaskSetInputDataTest, EmptyPortKey_ReturnsInvalidArgument) {
 // (3) Happy path: post a value, wait, read back via flow_node_get_input_data
 // ============================================================================
 
-TEST_F(EnvAddTaskSetInputDataTest, HappyPath_PostAndWait_InputDataMatches) {
+TEST_F(EnvAddTaskSetInputDataTest, HappyPath_PostAndWait_InputDataMatches)
+{
     FlowNodeHandle node_h = add_doubler();
     ASSERT_NE(node_h, nullptr);
 
@@ -217,9 +229,7 @@ TEST_F(EnvAddTaskSetInputDataTest, HappyPath_PostAndWait_InputDataMatches) {
     ASSERT_NE(data_h, nullptr);
 
     // Post the task — should return immediately.
-    EXPECT_EQ(
-        flow_env_add_task_set_input_data(env_handle_, node_h, "value", data_h),
-        FLOW_SUCCESS);
+    EXPECT_EQ(flow_env_add_task_set_input_data(env_handle_, node_h, "value", data_h), FLOW_SUCCESS);
 
     // Caller may release the FFI data handle right away (spec lifetime contract).
     flow_release_handle(data_h);
@@ -239,16 +249,15 @@ TEST_F(EnvAddTaskSetInputDataTest, HappyPath_PostAndWait_InputDataMatches) {
     flow_release_handle(read_h);
 }
 
-TEST_F(EnvAddTaskSetInputDataTest, HappyPath_ComputeRuns_OutputPortUpdated) {
+TEST_F(EnvAddTaskSetInputDataTest, HappyPath_ComputeRuns_OutputPortUpdated)
+{
     FlowNodeHandle node_h = add_doubler("d2");
     ASSERT_NE(node_h, nullptr);
 
     auto data_h = make_int_data(5);
     ASSERT_NE(data_h, nullptr);
 
-    EXPECT_EQ(
-        flow_env_add_task_set_input_data(env_handle_, node_h, "value", data_h),
-        FLOW_SUCCESS);
+    EXPECT_EQ(flow_env_add_task_set_input_data(env_handle_, node_h, "value", data_h), FLOW_SUCCESS);
 
     flow_release_handle(data_h);
     data_h = nullptr;
@@ -278,7 +287,8 @@ TEST_F(EnvAddTaskSetInputDataTest, HappyPath_ComputeRuns_OutputPortUpdated) {
 // acceptance criterion.
 // ============================================================================
 
-TEST_F(EnvAddTaskSetInputDataTest, DataHandleReleasedBeforeLambdaRuns_ComputeStillSucceeds) {
+TEST_F(EnvAddTaskSetInputDataTest, DataHandleReleasedBeforeLambdaRuns_ComputeStillSucceeds)
+{
     FlowNodeHandle node_h = add_doubler("d3");
     ASSERT_NE(node_h, nullptr);
 
@@ -286,9 +296,7 @@ TEST_F(EnvAddTaskSetInputDataTest, DataHandleReleasedBeforeLambdaRuns_ComputeSti
     auto data_h = make_int_data(99);
     ASSERT_NE(data_h, nullptr);
 
-    EXPECT_EQ(
-        flow_env_add_task_set_input_data(env_handle_, node_h, "value", data_h),
-        FLOW_SUCCESS);
+    EXPECT_EQ(flow_env_add_task_set_input_data(env_handle_, node_h, "value", data_h), FLOW_SUCCESS);
 
     // Release the FFI handle immediately after posting — before the worker has
     // had any chance to run. The shared_ptr captured in the lambda must keep
@@ -338,7 +346,8 @@ TEST_F(EnvAddTaskSetInputDataTest, DataHandleReleasedBeforeLambdaRuns_ComputeSti
 // failure here narrows the bug.
 // ============================================================================
 
-TEST_F(EnvAddTaskSetInputDataTest, Cascade_AtoB_DoublesTwice) {
+TEST_F(EnvAddTaskSetInputDataTest, Cascade_AtoB_DoublesTwice)
+{
     // Add A and B (both DoublerNodes), then connect A.result → B.value.
     FlowNodeHandle node_a = add_doubler("d_a");
     FlowNodeHandle node_b = add_doubler("d_b");
@@ -355,20 +364,17 @@ TEST_F(EnvAddTaskSetInputDataTest, Cascade_AtoB_DoublesTwice) {
     std::string a_id_str = a_id;
     std::string b_id_str = b_id;
 
-    FlowConnectionHandle conn = flow_graph_connect_nodes(
-        graph_handle_, a_id_str.c_str(), "result", b_id_str.c_str(), "value");
-    ASSERT_NE(conn, nullptr)
-        << "flow_graph_connect_nodes failed — last_error: "
-        << (flow_get_last_error() ? flow_get_last_error() : "(none)");
+    FlowConnectionHandle conn =
+        flow_graph_connect_nodes(graph_handle_, a_id_str.c_str(), "result", b_id_str.c_str(), "value");
+    ASSERT_NE(conn, nullptr) << "flow_graph_connect_nodes failed — last_error: "
+                             << (flow_get_last_error() ? flow_get_last_error() : "(none)");
 
     // Post 5 to A.value via the new symbol.  No flow_graph_run() — the
     // cascade is the whole point of the test; if it works, we don't need
     // to manually kick anything.
     FlowNodeDataHandle in_h = make_int_data(5);
     ASSERT_NE(in_h, nullptr);
-    EXPECT_EQ(flow_env_add_task_set_input_data(
-                  env_handle_, node_a, "value", in_h),
-              FLOW_SUCCESS);
+    EXPECT_EQ(flow_env_add_task_set_input_data(env_handle_, node_a, "value", in_h), FLOW_SUCCESS);
 
     flow_release_handle(in_h);
     in_h = nullptr;
@@ -379,8 +385,7 @@ TEST_F(EnvAddTaskSetInputDataTest, Cascade_AtoB_DoublesTwice) {
 
     // A.result should be 10 (5 * 2).
     FlowNodeDataHandle out_a = flow_node_get_output_data(node_a, "result");
-    ASSERT_NE(out_a, nullptr)
-        << "A.result should be populated after the kicked compute";
+    ASSERT_NE(out_a, nullptr) << "A.result should be populated after the kicked compute";
     int32_t a_val = 0;
     ASSERT_EQ(flow_data_get_int(out_a, &a_val), FLOW_SUCCESS);
     EXPECT_EQ(a_val, 10) << "A should have doubled the input (5 * 2 == 10)";
@@ -389,16 +394,15 @@ TEST_F(EnvAddTaskSetInputDataTest, Cascade_AtoB_DoublesTwice) {
     // B.result should be 20 (10 * 2) IF the cascade propagated.
     // If B is null or 0, the cascade did not reach B — that's the diagnostic.
     FlowNodeDataHandle out_b = flow_node_get_output_data(node_b, "result");
-    ASSERT_NE(out_b, nullptr)
-        << "B.result is missing — cascade did NOT reach B. "
-           "Either PropagateConnectionsData didn't enqueue a task for the "
-           "A.result → B.value connection, or the queued task threw silently. "
-           "Check Graph::PropagateConnectionsData and Connections::FindConnections.";
+    ASSERT_NE(out_b, nullptr) << "B.result is missing — cascade did NOT reach B. "
+                                 "Either PropagateConnectionsData didn't enqueue a task for the "
+                                 "A.result → B.value connection, or the queued task threw silently. "
+                                 "Check Graph::PropagateConnectionsData and Connections::FindConnections.";
     int32_t b_val = 0;
     ASSERT_EQ(flow_data_get_int(out_b, &b_val), FLOW_SUCCESS);
-    EXPECT_EQ(b_val, 20)
-        << "B should have doubled A's output (10 * 2 == 20). "
-           "Got " << b_val << " — the cascade fired but B saw the wrong input.";
+    EXPECT_EQ(b_val, 20) << "B should have doubled A's output (10 * 2 == 20). "
+                            "Got "
+                         << b_val << " — the cascade fired but B saw the wrong input.";
     flow_release_handle(out_b);
 }
 
@@ -416,20 +420,22 @@ TEST_F(EnvAddTaskSetInputDataTest, Cascade_AtoB_DoublesTwice) {
 // is GTEST_SKIPped, not failed.
 // ============================================================================
 
-namespace {
+namespace
+{
 constexpr const char* kTestModuleFmodPath =
     "/Users/shenning/Development/flow/flutter_fl_nodes/examples/fl_nodes_example/"
     "test/fixtures/test_module/build/test_module.fmod";
 }
 
-TEST_F(EnvAddTaskSetInputDataTest, Cascade_AtoB_ModuleLoaded_StringChain) {
+TEST_F(EnvAddTaskSetInputDataTest, Cascade_AtoB_ModuleLoaded_StringChain)
+{
     // Skip cleanly if the fixture isn't built — the test is a flutter_fl_nodes
     // artifact, not part of flow_ffi's own build.
     {
         std::ifstream probe(kTestModuleFmodPath);
-        if (!probe.good()) {
-            GTEST_SKIP() << "test_module.fmod not found at "
-                         << kTestModuleFmodPath
+        if (!probe.good())
+        {
+            GTEST_SKIP() << "test_module.fmod not found at " << kTestModuleFmodPath
                          << " — build the fixture first (cmake --build "
                             "flutter_fl_nodes/examples/.../test_module/build).";
         }
@@ -451,39 +457,31 @@ TEST_F(EnvAddTaskSetInputDataTest, Cascade_AtoB_ModuleLoaded_StringChain) {
 
     // Create A (PassthroughStringNode) and B (DisplayStringNode). These are
     // the exact two node types the user is chaining in the running app.
-    FlowNodeHandle node_a =
-        flow_graph_add_node(graph_handle_, "PassthroughStringNode", "passthrough_a");
-    FlowNodeHandle node_b =
-        flow_graph_add_node(graph_handle_, "DisplayStringNode", "display_b");
-    ASSERT_NE(node_a, nullptr)
-        << "flow_graph_add_node('PassthroughStringNode') failed — last_error: "
-        << (flow_get_last_error() ? flow_get_last_error() : "(none)");
-    ASSERT_NE(node_b, nullptr)
-        << "flow_graph_add_node('DisplayStringNode') failed — last_error: "
-        << (flow_get_last_error() ? flow_get_last_error() : "(none)");
+    FlowNodeHandle node_a = flow_graph_add_node(graph_handle_, "PassthroughStringNode", "passthrough_a");
+    FlowNodeHandle node_b = flow_graph_add_node(graph_handle_, "DisplayStringNode", "display_b");
+    ASSERT_NE(node_a, nullptr) << "flow_graph_add_node('PassthroughStringNode') failed — last_error: "
+                               << (flow_get_last_error() ? flow_get_last_error() : "(none)");
+    ASSERT_NE(node_b, nullptr) << "flow_graph_add_node('DisplayStringNode') failed — last_error: "
+                               << (flow_get_last_error() ? flow_get_last_error() : "(none)");
 
     // Snapshot the UUIDs before any subsequent flow_node_get_id call clobbers
     // the shared return buffer.
     const char* a_id_raw = flow_node_get_id(node_a);
     ASSERT_NE(a_id_raw, nullptr);
-    std::string a_id = a_id_raw;
+    std::string a_id     = a_id_raw;
     const char* b_id_raw = flow_node_get_id(node_b);
     ASSERT_NE(b_id_raw, nullptr);
     std::string b_id = b_id_raw;
 
     // Connect A.result → B.value (same connection shape the user makes).
-    FlowConnectionHandle conn = flow_graph_connect_nodes(
-        graph_handle_, a_id.c_str(), "result", b_id.c_str(), "value");
-    ASSERT_NE(conn, nullptr)
-        << "flow_graph_connect_nodes failed — last_error: "
-        << (flow_get_last_error() ? flow_get_last_error() : "(none)");
+    FlowConnectionHandle conn = flow_graph_connect_nodes(graph_handle_, a_id.c_str(), "result", b_id.c_str(), "value");
+    ASSERT_NE(conn, nullptr) << "flow_graph_connect_nodes failed — last_error: "
+                             << (flow_get_last_error() ? flow_get_last_error() : "(none)");
 
     // Post "hello" to A.value via the new symbol.
     FlowNodeDataHandle in_h = flow_data_create_string("hello");
     ASSERT_NE(in_h, nullptr);
-    EXPECT_EQ(flow_env_add_task_set_input_data(
-                  env_handle_, node_a, "value", in_h),
-              FLOW_SUCCESS);
+    EXPECT_EQ(flow_env_add_task_set_input_data(env_handle_, node_a, "value", in_h), FLOW_SUCCESS);
 
     flow_release_handle(in_h);
     in_h = nullptr;
@@ -493,11 +491,10 @@ TEST_F(EnvAddTaskSetInputDataTest, Cascade_AtoB_ModuleLoaded_StringChain) {
 
     // A.result should be "hello" (PassthroughString just echoes input).
     FlowNodeDataHandle out_a = flow_node_get_output_data(node_a, "result");
-    ASSERT_NE(out_a, nullptr)
-        << "A.result missing — PassthroughStringNode.Compute did not fire "
-           "OR did not call SetOutputData. Most likely SetInputData on the "
-           "worker thread isn't triggering InvokeCompute for module-loaded "
-           "nodes.";
+    ASSERT_NE(out_a, nullptr) << "A.result missing — PassthroughStringNode.Compute did not fire "
+                                 "OR did not call SetOutputData. Most likely SetInputData on the "
+                                 "worker thread isn't triggering InvokeCompute for module-loaded "
+                                 "nodes.";
     char* a_str = nullptr;
     ASSERT_EQ(flow_data_get_string(out_a, &a_str), FLOW_SUCCESS);
     ASSERT_NE(a_str, nullptr);
@@ -507,20 +504,18 @@ TEST_F(EnvAddTaskSetInputDataTest, Cascade_AtoB_ModuleLoaded_StringChain) {
 
     // B.result should be "hello" too IF the cascade propagated.
     FlowNodeDataHandle out_b = flow_node_get_output_data(node_b, "result");
-    ASSERT_NE(out_b, nullptr)
-        << "*** CASCADE DID NOT REACH B ***\n"
-           "B.result is null — the A→B propagation did NOT fire. Same "
-           "symptom as the Flutter app's '(no value)'. The cascade works "
-           "for inline-defined DoublerNode (see Cascade_AtoB_DoublesTwice) "
-           "but NOT for module-loaded nodes — the bug is in how module "
-           "nodes register or in how their EmitUpdate path interacts with "
-           "Graph::PropagateConnectionsData. Investigate the module-loader "
-           "AddNode path vs. the in-process Graph::AddNode path.";
+    ASSERT_NE(out_b, nullptr) << "*** CASCADE DID NOT REACH B ***\n"
+                                 "B.result is null — the A→B propagation did NOT fire. Same "
+                                 "symptom as the Flutter app's '(no value)'. The cascade works "
+                                 "for inline-defined DoublerNode (see Cascade_AtoB_DoublesTwice) "
+                                 "but NOT for module-loaded nodes — the bug is in how module "
+                                 "nodes register or in how their EmitUpdate path interacts with "
+                                 "Graph::PropagateConnectionsData. Investigate the module-loader "
+                                 "AddNode path vs. the in-process Graph::AddNode path.";
     char* b_str = nullptr;
     ASSERT_EQ(flow_data_get_string(out_b, &b_str), FLOW_SUCCESS);
     ASSERT_NE(b_str, nullptr);
-    EXPECT_STREQ(b_str, "hello")
-        << "B.result has wrong value — cascade fired but B saw wrong input.";
+    EXPECT_STREQ(b_str, "hello") << "B.result has wrong value — cascade fired but B saw wrong input.";
     std::free(b_str);
     flow_release_handle(out_b);
 

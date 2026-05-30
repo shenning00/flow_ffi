@@ -7,13 +7,15 @@
 
 // Shared wrapper structures for Environment and NodeFactory
 
-struct EnvWrapper {
+struct EnvWrapper
+{
     std::shared_ptr<flow::Env> env;
 
     EnvWrapper(std::shared_ptr<flow::Env> e) : env(std::move(e)) {}
 };
 
-struct NodeFactoryWrapper {
+struct NodeFactoryWrapper
+{
     std::shared_ptr<flow::NodeFactory> factory;
 
     NodeFactoryWrapper(std::shared_ptr<flow::NodeFactory> f) : factory(std::move(f)) {}
