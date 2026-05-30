@@ -147,3 +147,35 @@ install(FILES include/flow_ffi.h
 # Testing support
 enable_testing()
 add_subdirectory(test)
+
+# ---------------------------------------------------------------------------
+# Code formatting (clang-format).  Operates on flow_ffi's own sources only —
+# flow_wire is a submodule that carries its own .clang-format and format flow,
+# so it is intentionally excluded here.
+#
+#   cmake --build build --target format        # rewrite files in place
+#   cmake --build build --target format-check   # verify, non-zero on drift (CI)
+# ---------------------------------------------------------------------------
+find_program(CLANG_FORMAT_EXE NAMES clang-format clang-format-18 clang-format-17)
+if(CLANG_FORMAT_EXE)
+    file(GLOB_RECURSE FLOW_FFI_FORMAT_SOURCES CONFIGURE_DEPENDS
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/*.hpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/include/*.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/include/*.hpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/test/*.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/test/*.hpp
+    )
+    add_custom_target(format
+        COMMAND ${CLANG_FORMAT_EXE} -i ${FLOW_FFI_FORMAT_SOURCES}
+        COMMENT "clang-format -i over flow_ffi sources (${CLANG_FORMAT_EXE})"
+        VERBATIM
+    )
+    add_custom_target(format-check
+        COMMAND ${CLANG_FORMAT_EXE} --dry-run --Werror ${FLOW_FFI_FORMAT_SOURCES}
+        COMMENT "clang-format compliance check (no files modified)"
+        VERBATIM
+    )
+else()
+    message(STATUS "clang-format not found — 'format'/'format-check' targets unavailable")
+endif()
