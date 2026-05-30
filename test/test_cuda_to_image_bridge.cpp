@@ -16,9 +16,9 @@
 #include <flow/core/NodeFactory.hpp>
 #include <flow/core/UUID.hpp>
 
-#include <flow_wire/CudaDeviceImage.hpp>
-#include <flow_wire/CudaToImage.hpp>
-#include <flow_wire/Image.hpp>
+#include <wire/CudaDeviceImage.hpp>
+#include <wire/CudaToImage.hpp>
+#include <wire/Image.hpp>
 
 #include <cstdio>
 #include <cstdlib>

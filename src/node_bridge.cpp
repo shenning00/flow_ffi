@@ -6,9 +6,9 @@
 
 #include <cstring>
 
-#include <flow_wire/Image.hpp>
+#include <wire/Image.hpp>
 #if FLOW_FFI_HAS_CUDA
-#include <flow_wire/CudaDeviceImage.hpp>
+#include <wire/CudaDeviceImage.hpp>
 #endif
 
 #include "error_handling.hpp"

@@ -25,26 +25,25 @@ message(STATUS "Found flow-core package")
 
 option(FLOW_FFI_ENABLE_CUDA "Build CUDA image-path support" OFF)
 
-# Propagate the gate down to flow_wire *before* add_subdirectory.  flow_wire
-# reads its own option() after this CACHE BOOL … FORCE entry has been written,
-# so it sees the value set here rather than its own default.  Mirrors the
-# FLOW_INTERWORK_WITH_OPENCV pattern in flow_wire/CMakeLists.txt.
-set(FLOW_WIRE_WITH_CUDA ${FLOW_FFI_ENABLE_CUDA} CACHE BOOL
-    "flow_wire: build CUDA-aware wire types and adapter nodes" FORCE)
+# Absorbed wire layer (formerly the flow_wire submodule): owns the canonical
+# flow::Image wire type and the generic source/sink nodes (ImageOpenNode,
+# PreviewNode, DisplayValueNode), plus optionally compiled cv::Mat adapter
+# nodes and CUDA-aware nodes.  Compiled directly into flow_ffi.so from
+# src/wire/ and include/wire/ — registration entry point is src/wire/Register.cpp.
 
-# Point flow_wire's CUDA branch at our include directory.  flow_wire is
-# location-agnostic — works as a git submodule under flow_ffi/flow_wire/, as
-# a sibling at ../flow_wire/, or any other layout — by reading this variable
-# rather than hard-coding ../flow_ffi/include.
-set(FLOW_FFI_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/include CACHE PATH
-    "Where flow_wire (and any other downstream) finds flow_ffi/include" FORCE)
-
-# flow_wire: interwork layer that owns the canonical flow::Image wire type
-# and the generic source/sink nodes that produce/consume it (ImageOpenNode,
-# PreviewNode), plus optionally compiled cv::Mat adapter nodes and CUDA-aware
-# nodes.  Embedded as a git submodule at flow_wire/.  Built as a static
-# library and absorbed into flow_ffi.so.
-add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/flow_wire ${CMAKE_CURRENT_BINARY_DIR}/flow_wire)
+# cv::Mat <-> flow::Image adapter nodes, auto-disabled if OpenCV is not found.
+option(FLOW_INTERWORK_WITH_OPENCV
+       "Build cv::Mat <-> flow::Image adapter nodes (auto-disabled if OpenCV not found)"
+       ON)
+if(FLOW_INTERWORK_WITH_OPENCV)
+    find_package(OpenCV CONFIG QUIET)
+    if(OpenCV_FOUND)
+        message(STATUS "flow_ffi: OpenCV ${OpenCV_VERSION} found — cv::Mat adapters enabled")
+    else()
+        message(STATUS "flow_ffi: OpenCV not found — cv::Mat adapters disabled")
+        set(FLOW_INTERWORK_WITH_OPENCV OFF)
+    endif()
+endif()
 
 # Create shared library
 add_library(flow_ffi SHARED
@@ -70,6 +69,8 @@ add_library(flow_ffi SHARED
     # P12: non-CUDA GPU texture ops slot + host→texture bridge (always built)
     src/gpu_texture_ops_slot.cpp
     src/image_bridge_gpu.cpp
+    # Absorbed wire layer: generic node registration entry point
+    src/wire/Register.cpp
 )
 
 # Include directories
@@ -87,13 +88,23 @@ target_include_directories(flow_ffi
 target_link_libraries(flow_ffi
     PUBLIC
         flow-core::flow-core
-        flow_wire
 )
+
+# OpenCV adapter nodes (folded in from the former flow_wire library).
+if(FLOW_INTERWORK_WITH_OPENCV)
+    target_compile_definitions(flow_ffi PRIVATE FLOW_INTERWORK_WITH_OPENCV)
+    target_include_directories(flow_ffi PRIVATE ${OpenCV_INCLUDE_DIRS})
+    # Link OpenCV PUBLIC: any consumer calling RegisterAllNodes transitively
+    # pulls these in (today only flow_ffi.so itself).
+    target_link_libraries(flow_ffi PUBLIC ${OpenCV_LIBS})
+endif()
 
 if (FLOW_FFI_ENABLE_CUDA)
     enable_language(CUDA)
     find_package(CUDAToolkit REQUIRED)
     target_compile_definitions(flow_ffi PUBLIC FLOW_FFI_HAS_CUDA=1)
+    # Compile the absorbed wire CUDA nodes (formerly gated by FLOW_WIRE_WITH_CUDA).
+    target_compile_definitions(flow_ffi PRIVATE WIRE_WITH_CUDA)
     target_sources(flow_ffi PRIVATE src/image_bridge_cuda.cpp)
     target_link_libraries(flow_ffi PRIVATE CUDA::cudart CUDA::cuda_driver)
 
@@ -144,14 +155,17 @@ install(FILES include/flow_ffi.h
     DESTINATION include
 )
 
+# Public wire headers — the `#include <wire/...>` surface absorbed from the
+# former flow_wire library (exposed via the PUBLIC include dir above).
+install(DIRECTORY include/wire DESTINATION include)
+
 # Testing support
 enable_testing()
 add_subdirectory(test)
 
 # ---------------------------------------------------------------------------
-# Code formatting (clang-format).  Operates on flow_ffi's own sources only —
-# flow_wire is a submodule that carries its own .clang-format and format flow,
-# so it is intentionally excluded here.
+# Code formatting (clang-format).  Globs src/ and include/ recursively, so the
+# absorbed wire sources under src/wire/ and include/wire/ are covered too.
 #
 #   cmake --build build --target format        # rewrite files in place
 #   cmake --build build --target format-check   # verify, non-zero on drift (CI)
